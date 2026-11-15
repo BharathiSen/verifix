@@ -173,3 +173,63 @@ def test_demo_still_reproduces_the_recorded_evidence(
     # Byte for byte, digests included: digest() hashes links and paths but
     # not captured_at, so the same topology gives the same digest every run.
     assert printed == RECORDING.read_text(encoding="utf-8")
+
+
+# analyse.py: Table 2
+
+def _table(tmp_path: Path, argv: list[str] | None = None) -> str:
+    from experiments import analyse
+
+    out = io.StringIO()
+    analyse.main(["--csv", str(tmp_path / "cases.csv"), *(argv or [])], stdout=out)
+    return out.getvalue()
+
+
+def _body(table: str) -> list[list[str]]:
+    lines = [ln for ln in table.splitlines() if ln.startswith("| ")]
+    return [[cell.strip() for cell in ln.strip("|").split("|")] for ln in lines[1:]]
+
+
+def test_table_has_one_row_per_case_and_variant(tmp_path: Path) -> None:
+    run.main(["--out", str(tmp_path / "cases.csv")])
+    body = _body(_table(tmp_path))
+    assert [(r[0], r[1]) for r in body] == [
+        ("1", "whole-state"), ("2", "unknown=open"), ("2", "unknown=closed"),
+        ("3", "whole-state"), ("3", "declared"),
+    ]
+
+
+def test_table_keeps_not_run_apart_from_abstained(tmp_path: Path) -> None:
+    run.main(["--out", str(tmp_path / "cases.csv")])
+    case2_open = _body(_table(tmp_path))[1]
+    feasibility, freshness = case2_open[7], case2_open[8]
+    assert feasibility == "n/a / n/a"        # ran in both modes, abstained
+    assert freshness == "not run / pass"     # never attempted in check_once
+
+
+def test_table_selects_on_mode_so_off_rows_never_appear(tmp_path: Path) -> None:
+    run.main(["--out", str(tmp_path / "cases.csv")])
+    table = _table(tmp_path)
+    # OFF's 0/0 coverage would show up in a verdict cell had it leaked in.
+    assert "(0/0)" not in table
+
+
+def test_table_defaults_to_the_latest_run(tmp_path: Path) -> None:
+    out = tmp_path / "cases.csv"
+    run.main(["--out", str(out)])
+    first = next(csv.DictReader(out.open(encoding="utf-8")))["run_id"]
+    text = out.read_text(encoding="utf-8")
+    # A second, later run: same rows, new id and timestamp.
+    rows = list(csv.DictReader(io.StringIO(text)))
+    for r in rows:
+        r["run_id"], r["timestamp"] = "laterrun", "2999-01-01T00:00:00+00:00"
+    with out.open("a", newline="", encoding="utf-8") as f:
+        csv.DictWriter(f, fieldnames=run.COLUMNS).writerows(rows)
+    assert "run laterrun" in _table(tmp_path)
+    assert f"run {first}" in _table(tmp_path, ["--run", first])
+
+
+def test_analyse_refuses_a_foreign_schema(tmp_path: Path) -> None:
+    (tmp_path / "cases.csv").write_text("run_id,verdict\nx,allow\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="header does not match"):
+        _table(tmp_path)
