@@ -1,7 +1,7 @@
 # Local working context for Claude sessions; not part of the project.
 CLAUDE.md
-# phases.md is deliberately NOT ignored: it holds the research decisions and
-# phase history, which cannot be rebuilt the way code can.
+# Local working context: the build plan and phase handoff notes. Never commit.
+phases.md
 
 # Python
 __pycache__/
