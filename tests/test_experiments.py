@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import csv
 import io
-import re
 import sys
 from pathlib import Path
 
@@ -162,11 +161,6 @@ def test_mininet_flag_without_mininet_fails_loudly(monkeypatch: pytest.MonkeyPat
         run.main(["--mininet"], stdout=io.StringIO())
 
 
-def _masked(text: str) -> str:
-    # Digests hash a wall-clock capture time, so they differ on every run.
-    return re.sub(r"[0-9a-f]{16}", "<digest>", text)
-
-
 def test_demo_still_reproduces_the_recorded_evidence(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -176,4 +170,6 @@ def test_demo_still_reproduces_the_recorded_evidence(
     monkeypatch.setattr(sys, "argv", ["run_demo.py", "--mininet"])
     run_demo.main()
     printed = capsys.readouterr().out
-    assert _masked(printed) == _masked(RECORDING.read_text(encoding="utf-8"))
+    # Byte for byte, digests included: digest() hashes links and paths but
+    # not captured_at, so the same topology gives the same digest every run.
+    assert printed == RECORDING.read_text(encoding="utf-8")
