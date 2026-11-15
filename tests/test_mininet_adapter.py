@@ -236,3 +236,35 @@ def test_declared_binding_still_catches_a_dependency_change(
     binding = next(c for c in d.checks if c.name == "state_binding")
     assert binding.status is CheckStatus.FAIL
     assert binding.reason.startswith("declared (3 keys)")
+
+
+PRIMARY_PREMISE = ["links:s1-s2"]
+
+
+@pytest.mark.parametrize(
+    ("depends_on", "binding"),
+    [
+        (None, CheckStatus.FAIL),
+        # Declares only what the reroute touches: the gate cannot see that
+        # the reason for rerouting is gone.
+        (BACKUP_DEPS, CheckStatus.PASS),
+        # Declares why it decided as well: the vanished premise is caught.
+        (PRIMARY_PREMISE + BACKUP_DEPS, CheckStatus.FAIL),
+    ],
+    ids=["whole-state", "declared-target", "declared-premise"],
+)
+def test_primary_recovered_is_caught_by_binding_not_feasibility(
+    net: FakeNet,
+    provider: MininetStateProvider,
+    depends_on: list[str] | None,
+    binding: CheckStatus,
+) -> None:
+    # Case 5: the reroute was a response to s1-s2 being down. s1-s2 comes back
+    # before execution, so the backup is still feasible but the action is no
+    # longer warranted. Only state binding can tell.
+    net.down("s1", "s2")
+    action = _reroute(provider, depends_on=depends_on)
+    net.link("s1", "s2").intf2.up = True
+    d = Gate(provider, mode=GateMode.REVALIDATE).verify(action)
+    assert _status(d.checks, "feasibility") is CheckStatus.PASS
+    assert _status(d.checks, "state_binding") is binding
