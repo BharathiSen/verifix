@@ -1,0 +1,17 @@
+# Local working context for Claude sessions; not part of the project.
+CLAUDE.md
+# Local working context: the build plan and phase handoff notes.
+phases.md
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+
+# results/ is deliberately NOT ignored: experiment CSVs are research data.
