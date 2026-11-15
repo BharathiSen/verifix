@@ -11,3 +11,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["verifix*"]
+
+[tool.pytest.ini_options]
+# experiments/ is run from the repo root and is not an installed package, so
+# its tests need the root on the import path, as `python -m` gives it.
+pythonpath = ["."]

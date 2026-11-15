@@ -1,0 +1,211 @@
+"""Cases 1-5: the single definition, shared by the demo and the runner.
+
+Each case runs the gate itself and returns trials rather than actions,
+because Cases 4 and 5 are sequences: snapshot, change the network, verify.
+The verdicts only mean something while the network is in the changed state.
+
+Every trial runs all three modes, so the CSV is uniform. What to show is the
+caller's choice: the demo prints a narrative subset, `run.py` writes every row.
+Nothing here prints.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
+from verifix.adapters.base import StateProvider, StaticStateProvider
+from verifix.adapters.mininet import MininetStateProvider
+from verifix.gate import DEFAULT_MIN_COVERAGE, Gate
+from verifix.models import (
+    Decision,
+    GateMode,
+    NetworkState,
+    ProposedAction,
+    UnknownPolicy,
+)
+
+MODES = (GateMode.OFF, GateMode.CHECK_ONCE, GateMode.REVALIDATE)
+
+MININET_PATHS = {"primary": ["s1-s2"], "backup": ["s1-s3", "s2-s3"]}
+BACKUP_DEPS = ["paths:backup", "links:s1-s3", "links:s2-s3"]
+
+
+@dataclass(frozen=True)
+class Trial:
+    """One action under one configuration, decided in every mode."""
+
+    case: int
+    variant: str
+    adapter: str
+    action: ProposedAction
+    unknown_policy: UnknownPolicy
+    min_coverage: float
+    decisions: dict[GateMode, Decision]
+
+    @property
+    def binding(self) -> str:
+        # Read off the action rather than stored, so the label cannot
+        # disagree with what StateBindingCheck actually bound to.
+        if self.action.state_digest is None:
+            return "none"
+        return "whole" if self.action.depends_on is None else "declared"
+
+
+def decide(
+    case: int,
+    variant: str,
+    adapter: str,
+    provider: StateProvider,
+    action: ProposedAction,
+    unknown_policy: UnknownPolicy = UnknownPolicy.OPEN,
+    min_coverage: float = DEFAULT_MIN_COVERAGE,
+) -> Trial:
+    decisions = {
+        mode: Gate(provider, mode=mode, unknown_policy=unknown_policy,
+                   min_coverage=min_coverage).verify(action)
+        for mode in MODES
+    }
+    return Trial(case, variant, adapter, action, unknown_policy, min_coverage,
+                 decisions)
+
+
+def reroute(action_id: str, seen: NetworkState,
+            depends_on: list[str] | None = None) -> ProposedAction:
+    return ProposedAction(
+        action_id=action_id, kind="reroute", params={"target_path": "backup"},
+        proposed_at=seen.captured_at, state_digest=seen.digest(depends_on),
+        depends_on=depends_on,
+    )
+
+
+def case_known(now: float) -> list[Trial]:
+    """Case 1: reroute onto 'backup', which dies before execution."""
+    at_proposal = NetworkState(
+        captured_at=now,
+        links={"r1-r2": True, "r3-r4": True},
+        paths={"primary": ["r1-r2"], "backup": ["r3-r4"]},
+    )
+    live = at_proposal.model_copy(update={  # backup went down in the meantime
+        "captured_at": now + 2.0, "links": {"r1-r2": True, "r3-r4": False},
+    })
+    provider = StaticStateProvider(live, at_proposal)
+    return [decide(1, "whole-state", "static", provider,
+                   reroute("a-001", at_proposal))]
+
+
+def case_unknown(now: float) -> list[Trial]:
+    """Case 2: opaque state, an action kind VeriFix has never seen."""
+    # No topology exposed, no state binding on the action, an unknown kind.
+    opaque = NetworkState(captured_at=now + 1.0, metrics={"p99_latency_ms": 31.0})
+    provider = StaticStateProvider(opaque, at_proposal=opaque)
+    unknown = ProposedAction(
+        action_id="a-002", kind="rebalance_ecmp_hash",
+        params={"router": "r7", "seed": 42}, proposed_at=now,
+    )
+    # 0.6 puts the floor above the 2/4 this action can reach, so the
+    # unknown policy, not the checks, decides the verdict.
+    return [
+        decide(2, f"unknown={policy.value}", "static", provider, unknown,
+               unknown_policy=policy, min_coverage=0.6)
+        for policy in (UnknownPolicy.OPEN, UnknownPolicy.CLOSED)
+    ]
+
+
+def case_binding_scope(now: float) -> list[Trial]:
+    """Case 3: an unrelated link drops; whole-state vs declared binding."""
+    at_proposal = NetworkState(
+        captured_at=now,
+        links={"r1-r2": True, "r3-r4": True, "r5-r6": True},
+        paths={"primary": ["r1-r2"], "backup": ["r3-r4"]},
+    )
+    live = at_proposal.model_copy(update={  # r5-r6 is on neither path
+        "captured_at": now + 2.0,
+        "links": {"r1-r2": True, "r3-r4": True, "r5-r6": False},
+    })
+    provider = StaticStateProvider(live, at_proposal)
+    return [
+        decide(3, label, "static", provider,
+               reroute(f"a-003-{label}", at_proposal, deps))
+        for label, deps in (("whole-state", None),
+                            ("declared", ["paths:backup", "links:r3-r4"]))
+    ]
+
+
+STATIC_CASES: tuple[Callable[[float], list[Trial]], ...] = (
+    case_known, case_unknown, case_binding_scope,
+)
+
+
+def static_trials(now: float) -> list[Trial]:
+    return [trial for case in STATIC_CASES for trial in case(now)]
+
+
+def case_target_drops(net: Any, provider: MininetStateProvider) -> list[Trial]:
+    """Case 4: s1-s3 dropped between proposal and execution."""
+    whole = reroute("mn4-whole", provider.snapshot("mn4-whole"))
+    declared = reroute("mn4-declared", provider.snapshot("mn4-declared"),
+                       BACKUP_DEPS)
+    net.configLinkStatus("s1", "s3", "down")
+    trials = [decide(4, label, "mininet", provider, action)
+              for label, action in (("whole-state", whole),
+                                    ("declared", declared))]
+    net.configLinkStatus("s1", "s3", "up")  # restore for Case 5
+    return trials
+
+
+def case_premise_recovers(
+    net: Any, provider: MininetStateProvider
+) -> list[Trial]:
+    """Case 5: the primary s1-s2 recovers before the reroute runs."""
+    # The agent reroutes *because* s1-s2 is down. Every scope sees the same
+    # proposal state; they differ only in what the decision is bound to.
+    net.configLinkStatus("s1", "s2", "down")
+    scopes: list[tuple[str, list[str] | None]] = [
+        ("whole-state", None),
+        ("declared target only", BACKUP_DEPS),
+        ("declared premise+target", ["links:s1-s2", *BACKUP_DEPS]),
+    ]
+    actions = [
+        (label, reroute(f"mn5-{i}", provider.snapshot(f"mn5-{i}"), deps))
+        for i, (label, deps) in enumerate(scopes)
+    ]
+    net.configLinkStatus("s1", "s2", "up")
+    return [decide(5, label, "mininet", provider, action)
+            for label, action in actions]
+
+
+def network_trials(net: Any) -> list[Trial]:
+    """Cases 4 and 5 against any net with Mininet's link API.
+
+    Split from `mininet_trials` so the case logic can be exercised against a
+    stub without Mininet installed.
+    """
+    provider = MininetStateProvider(net, MININET_PATHS)
+    return case_target_drops(net, provider) + case_premise_recovers(net, provider)
+
+
+def mininet_trials() -> list[Trial]:
+    """Cases 4 and 5 on a real Mininet triangle. Linux, root, Mininet."""
+    # Imported here so Cases 1-3 run on machines without Mininet.
+    from mininet.net import Mininet
+    from mininet.topo import Topo
+
+    class Triangle(Topo):
+        """h1-s1-s2-h2 is the primary path; s1-s3-s2 is the backup."""
+
+        def build(self) -> None:
+            h1, h2 = self.addHost("h1"), self.addHost("h2")
+            s1, s2, s3 = (self.addSwitch(n) for n in ("s1", "s2", "s3"))
+            for a, b in ((h1, s1), (s1, s2), (s1, s3), (s3, s2), (s2, h2)):
+                self.addLink(a, b)
+
+    # No controller: the cases check link state, they do not forward traffic,
+    # and without one the triangle cannot form a broadcast loop.
+    net = Mininet(topo=Triangle(), controller=None)
+    net.start()
+    try:
+        return network_trials(net)
+    finally:
+        net.stop()
