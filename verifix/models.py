@@ -1,8 +1,8 @@
 """Core data types exchanged across the VeriFix boundary.
 
 Everything that crosses the sidecar's API is defined here. Keeping these
-environment-agnostic is what lets the same gate run against Mininet,
-NetArena, or a replayed trace file.
+environment-agnostic is what lets the same gate run against any
+StateProvider, Mininet or otherwise.
 """
 
 from __future__ import annotations

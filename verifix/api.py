@@ -27,7 +27,7 @@ def configure(gate: Gate | None) -> None:
 class VerifyRequest(BaseModel):
     action: ProposedAction
     #: Optional: callers that hold their own state can pass it in instead of
-    #: relying on the configured provider. Useful for offline replay.
+    #: relying on the configured provider.
     live_state: NetworkState | None = None
     #: Needed only for CHECK_ONCE with caller-supplied state. Without it a
     #: CHECK_ONCE request errors rather than checking the live state.

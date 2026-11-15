@@ -1,14 +1,11 @@
 """The environment boundary.
 
-This interface is what turns VeriFix from a Mininet script into a product.
-The gate never imports Mininet, NetArena, or a trace file - it asks a
-StateProvider for state. Swap the provider, same gate, same checks, same
-results pipeline.
+The gate never imports an environment - it asks a StateProvider for state.
+Swap the provider, same gate, same checks.
 
 Implementations:
-    adapters/mininet.py    - your development and demo environment
-    adapters/netarena.py   - the shared benchmark, for the paper's numbers
-    adapters/replay.py     - offline replay of recorded agent traces
+    StaticStateProvider (below) - tests, the static cases, caller-supplied state
+    adapters/mininet.py         - a running Mininet network
 """
 
 from __future__ import annotations
@@ -28,8 +25,8 @@ class StateProvider(ABC):
     def state_at_proposal(self, action: ProposedAction) -> NetworkState:
         """The state as it was when the agent made this decision.
 
-        For live environments this is a cached snapshot; for replayed traces
-        it is read from the record.
+        For a live environment this is a snapshot cached when the agent
+        decided; for caller-supplied state it is whatever the caller passed.
         """
         ...
 

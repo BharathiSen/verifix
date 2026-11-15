@@ -14,10 +14,15 @@ agent  ──proposes──▶  VeriFix  ──allow──▶  controller ──
 
 ## Why
 
-Existing work validates an agent's proposed fix once, at proposal time. But the
-network keeps moving. A fix that was correct when it was checked can be wrong —
-or harmful — by the time it runs. VeriFix re-validates against live state at the
-moment of execution, and measures how often that matters.
+An agent proposes an action based on the network as it was when it looked. By
+the time the action runs, the network may have moved. VeriFix re-reads state at
+execution and checks the action against what is true then, reporting how much
+of the check set it was able to apply.
+
+Pre-execution revalidation is established prior art (TOCTOU-Bench, DYN-WEB,
+Commit-Time Authorization, "Stale Does Not Mean Unsafe"). This implementation
+occupies one point in that design space — a digest over whole or declared
+state, plus freshness — and measures that point's costs on a running network.
 
 ## Quickstart
 
@@ -103,9 +108,10 @@ State binding has two scopes. If the action lists the state keys its decision
 rested on (`depends_on`, e.g. `["paths:backup", "links:r3-r4"]`), only those
 are compared, so an unrelated link flap does not block it. If it lists nothing,
 the whole state is compared, which works for any agent but blocks on any
-change. The scope is recorded on every result. Declared binding needs the
-agent's cooperation, so replayed traces fall back to whole-state or, with no
-digest at all, `not_applicable`.
+change. The scope is recorded on every result. Declared binding is only as
+good as the declaration: if it names what the action acts on but not why it was
+chosen, a change to the premise passes unseen. An action with no digest at all
+gets `not_applicable`.
 
 When coverage falls below `min_coverage`, the decision is flagged
 `weakly_verified` and `unknown_policy` decides what to do with it:
@@ -138,17 +144,34 @@ verifix/
 └── adapters/
     ├── base.py        StateProvider — the environment boundary
     └── mininet.py     reads a running Mininet net; never imports Mininet
+experiments/
+├── cases.py           Cases 1–5, the single definition
+├── run.py             one CSV row per case, variant and mode
+└── analyse.py         Table 2 from results/mininet-cases.csv
+demo/run_demo.py       prints a narrative subset of the same cases
+results/               research data, append-only
 ```
 
 The gate never imports an environment. Write a `StateProvider` and the same
-gate, checks and results pipeline run anywhere:
+gate and checks run against it. The only environment adapter is
+`adapters/mininet.py`.
 
-- `adapters/mininet.py` — development and demo
-- `adapters/netarena.py` — the shared benchmark, for published comparisons
-- `adapters/replay.py` — offline replay of recorded agent traces
+## Experiments
+
+```bash
+python -m experiments.run                    # Cases 1–3, CSV to stdout
+sudo .venv/bin/python -m experiments.run --mininet --out results/mininet-cases.csv
+python -m experiments.analyse                # Table 2
+```
+
+Run from the repository root. `--mininet` needs Linux, root and Mininet, and
+stops with an error if Mininet is missing rather than quietly running three
+cases.
 
 ## Status
 
-Early. Core gate, check set, the Mininet adapter and tests are in place. The
-Mininet adapter is tested against a stubbed network; its real-topology demo
-runs on the Linux VM. NetArena and replay adapters are next.
+The gate, checks, Mininet adapter, HTTP API and evaluation tooling are built
+and tested. Cases 1–5 run on a real Mininet topology on the Linux VM. There is
+no evaluation on real agents' actions: the two network-operations agent
+benchmarks examined (NetArena, NIKA) don't exercise state-changing actions with
+proposal-time state.
