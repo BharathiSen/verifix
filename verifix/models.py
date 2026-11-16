@@ -170,7 +170,11 @@ class Decision(BaseModel):
     checks: list[CheckResult] = Field(default_factory=list)
     coverage: Coverage = Field(default_factory=Coverage)
     weakly_verified: bool = Field(
-        False, description="True when coverage fell below the configured floor"
+        False,
+        description=(
+            "True when coverage fell below the configured floor, or when any "
+            "check (or the state provider) errored"
+        ),
     )
     latency_ms: float = 0.0
 
@@ -180,13 +184,21 @@ class Decision(BaseModel):
         # "checked a little" are different conditions in the results.
         if self.mode is GateMode.OFF:
             return "verification disabled"
+        # Errors are named wherever they occur: a reason that reads as a
+        # clean result while a check crashed is the silent failure the gate
+        # exists to prevent.
+        errored = (
+            f"; errored: {', '.join(self.coverage.errored)}"
+            if self.coverage.errored
+            else ""
+        )
         failed = [c for c in self.checks if c.status is CheckStatus.FAIL]
         if failed:
-            return "; ".join(f"{c.name}: {c.reason}" for c in failed)
+            return "; ".join(f"{c.name}: {c.reason}" for c in failed) + errored
         if self.weakly_verified:
             return (
                 f"weakly verified: only {self.coverage.evaluated}/"
                 f"{self.coverage.total} checks applied "
-                f"(skipped: {', '.join(self.coverage.skipped) or 'none'})"
+                f"(skipped: {', '.join(self.coverage.skipped) or 'none'}{errored})"
             )
         return f"{self.coverage.evaluated}/{self.coverage.total} checks passed"

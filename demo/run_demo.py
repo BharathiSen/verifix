@@ -2,8 +2,9 @@
 
 Case 1: a known action, three modes, three outcomes.
 Case 2: an action kind VeriFix has never seen - it degrades, and says so.
-Case 3: an unrelated link drops - whole-state binding blocks, declared does not.
-Case 4 (--mininet): Case 1 on a real Mininet topology. Linux, root, Mininet.
+Case 3 (--mininet): a link on neither path drops - whole-state binding blocks,
+        declared does not. Linux, root, Mininet.
+Case 4 (--mininet): Case 1 on the same Mininet topology.
 Case 5 (--mininet): the primary recovers before execution. The backup is still
         feasible, so only state binding can block, and only if the binding
         covers the premise the agent acted on.
@@ -12,8 +13,10 @@ Case 5 (--mininet): the primary recovers before execution. The backup is still
     sudo python demo/run_demo.py --mininet
 
 The cases are defined in experiments/cases.py. This file only prints them,
-and it prints a subset on purpose: results/phase1-demo-2026-11-15.txt is
-Phase 1's recorded evidence, and the demo must keep reproducing it.
+and it prints a subset on purpose: results/phase4-demo-2026-11-16.txt is the
+recorded evidence, and the demo must keep reproducing it. It supersedes
+results/phase1-demo-2026-11-15.txt, recorded when Case 3 was static and the
+topology had no h3.
 """
 
 from __future__ import annotations
@@ -27,7 +30,6 @@ sys.path.insert(0, ".")
 from experiments.cases import (
     MODES,
     Trial,
-    case_binding_scope,
     case_known,
     case_unknown,
     mininet_trials,
@@ -65,7 +67,7 @@ def print_unknown(trials: list[Trial]) -> None:
 
 
 def print_binding_scope(trials: list[Trial]) -> None:
-    banner("CASE 3  unrelated link drops: whole-state vs declared binding")
+    banner("CASE 3  Mininet: h3-s3, on neither path, drops: whole-state vs declared")
     for trial in trials:
         d = trial.decisions[GateMode.REVALIDATE]
         print(f"  {trial.variant:<12} {d.verdict.value.upper():<5} {d.reason}")
@@ -91,6 +93,8 @@ def print_premise_recovers(trials: list[Trial]) -> None:
 
 
 def print_mininet(trials: list[Trial]) -> None:
+    print_binding_scope([t for t in trials if t.case == 3])
+    print()
     print_target_drops([t for t in trials if t.case == 4])
     print()
     print_premise_recovers([t for t in trials if t.case == 5])
@@ -99,13 +103,12 @@ def print_mininet(trials: list[Trial]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--mininet", action="store_true",
-                        help="also run Cases 4 and 5 on a real Mininet topology")
+                        help="also run Cases 3-5 on a real Mininet topology")
     args = parser.parse_args()
 
     now = time.time()
     for build, show in ((case_known, print_known),
-                        (case_unknown, print_unknown),
-                        (case_binding_scope, print_binding_scope)):
+                        (case_unknown, print_unknown)):
         show(build(now))
         print()
     if args.mininet:

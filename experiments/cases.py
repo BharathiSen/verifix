@@ -1,7 +1,7 @@
 """Cases 1-5: the single definition, shared by the demo and the runner.
 
 Each case runs the gate itself and returns trials rather than actions,
-because Cases 4 and 5 are sequences: snapshot, change the network, verify.
+because Cases 3-5 are sequences: snapshot, change the network, verify.
 The verdicts only mean something while the network is in the changed state.
 
 Every trial runs all three modes, so the CSV is uniform. What to show is the
@@ -113,33 +113,32 @@ def case_unknown(now: float) -> list[Trial]:
     ]
 
 
-def case_binding_scope(now: float) -> list[Trial]:
-    """Case 3: an unrelated link drops; whole-state vs declared binding."""
-    at_proposal = NetworkState(
-        captured_at=now,
-        links={"r1-r2": True, "r3-r4": True, "r5-r6": True},
-        paths={"primary": ["r1-r2"], "backup": ["r3-r4"]},
-    )
-    live = at_proposal.model_copy(update={  # r5-r6 is on neither path
-        "captured_at": now + 2.0,
-        "links": {"r1-r2": True, "r3-r4": True, "r5-r6": False},
-    })
-    provider = StaticStateProvider(live, at_proposal)
-    return [
-        decide(3, label, "static", provider,
-               reroute(f"a-003-{label}", at_proposal, deps))
-        for label, deps in (("whole-state", None),
-                            ("declared", ["paths:backup", "links:r3-r4"]))
-    ]
-
-
 STATIC_CASES: tuple[Callable[[float], list[Trial]], ...] = (
-    case_known, case_unknown, case_binding_scope,
+    case_known, case_unknown,
 )
 
 
 def static_trials(now: float) -> list[Trial]:
     return [trial for case in STATIC_CASES for trial in case(now)]
+
+
+def case_binding_scope(net: Any, provider: MininetStateProvider) -> list[Trial]:
+    """Case 3: h3-s3, on neither path, drops; whole-state vs declared binding.
+
+    On the same topology as Cases 4 and 5, so the false block here and the
+    silent miss in Case 5 come from one gate, one provider, one network.
+    h3 is a stub host: its link touches s3 but is in no path, and no traffic
+    between h1 and h2 needs it, so the reroute stays sound when it drops.
+    """
+    whole = reroute("mn3-whole", provider.snapshot("mn3-whole"))
+    declared = reroute("mn3-declared", provider.snapshot("mn3-declared"),
+                       BACKUP_DEPS)
+    net.configLinkStatus("h3", "s3", "down")
+    trials = [decide(3, label, "mininet", provider, action)
+              for label, action in (("whole-state", whole),
+                                    ("declared", declared))]
+    net.configLinkStatus("h3", "s3", "up")  # restore for Case 4
+    return trials
 
 
 def case_target_drops(net: Any, provider: MininetStateProvider) -> list[Trial]:
@@ -177,33 +176,53 @@ def case_premise_recovers(
 
 
 def network_trials(net: Any) -> list[Trial]:
-    """Cases 4 and 5 against any net with Mininet's link API.
+    """Cases 3, 4 and 5 against any net with Mininet's link API.
 
     Split from `mininet_trials` so the case logic can be exercised against a
-    stub without Mininet installed.
+    stub without Mininet installed. One provider for all three: each case
+    restores the link it dropped before the next one snapshots.
     """
     provider = MininetStateProvider(net, MININET_PATHS)
-    return case_target_drops(net, provider) + case_premise_recovers(net, provider)
+    return (case_binding_scope(net, provider)
+            + case_target_drops(net, provider)
+            + case_premise_recovers(net, provider))
 
 
-def mininet_trials() -> list[Trial]:
-    """Cases 4 and 5 on a real Mininet triangle. Linux, root, Mininet."""
-    # Imported here so Cases 1-3 run on machines without Mininet.
+#: The topology's links, in the order they are added. The test stub reads
+#: this too, so the stub and the VM cannot drift apart.
+TRIANGLE_LINKS = (("h1", "s1"), ("s1", "s2"), ("s1", "s3"), ("s3", "s2"),
+                  ("s2", "h2"), ("h3", "s3"))
+
+
+def build_triangle() -> Any:
+    """The Mininet net for Cases 3-5, built but not started. Linux, Mininet.
+
+    h1-s1-s2-h2 is the primary path, s1-s3-s2 the backup, and h3 a stub host
+    on s3 whose link is on neither path (Case 3 drops it).
+    """
+    # Imported here so Cases 1-2 run on machines without Mininet.
     from mininet.net import Mininet
     from mininet.topo import Topo
 
     class Triangle(Topo):
-        """h1-s1-s2-h2 is the primary path; s1-s3-s2 is the backup."""
-
         def build(self) -> None:
-            h1, h2 = self.addHost("h1"), self.addHost("h2")
-            s1, s2, s3 = (self.addSwitch(n) for n in ("s1", "s2", "s3"))
-            for a, b in ((h1, s1), (s1, s2), (s1, s3), (s3, s2), (s2, h2)):
+            for name in sorted({n for link in TRIANGLE_LINKS for n in link}):
+                if name.startswith("h"):
+                    self.addHost(name)
+                else:
+                    self.addSwitch(name)
+            for a, b in TRIANGLE_LINKS:
                 self.addLink(a, b)
 
-    # No controller: the cases check link state, they do not forward traffic,
-    # and without one the triangle cannot form a broadcast loop.
-    net = Mininet(topo=Triangle(), controller=None)
+    # No controller: the cases read link state and forward no traffic. What
+    # the switches do with frames in that state depends on their OVS fail
+    # mode, which is recorded from the VM rather than assumed here.
+    return Mininet(topo=Triangle(), controller=None)
+
+
+def mininet_trials() -> list[Trial]:
+    """Cases 3, 4 and 5 on the real Mininet topology. Linux, root, Mininet."""
+    net = build_triangle()
     net.start()
     try:
         return network_trials(net)

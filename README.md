@@ -22,7 +22,8 @@ of the check set it was able to apply.
 Pre-execution revalidation is established prior art (TOCTOU-Bench, DYN-WEB,
 Commit-Time Authorization, "Stale Does Not Mean Unsafe"). This implementation
 occupies one point in that design space — a digest over whole or declared
-state, plus freshness — and measures that point's costs on a running network.
+state, plus freshness — and measures that point's costs on hand-built cases,
+three of them on a small Mininet topology.
 
 ## Quickstart
 
@@ -40,8 +41,8 @@ and execution, and shows the three modes disagreeing:
   revalidate   BLOCK cov 4/4  feasibility: path 'backup' has down links: r3-r4; state_binding: whole-state: state changed since proposal (...)
 ```
 
-On a Linux machine with Mininet, `sudo python demo/run_demo.py --mininet` runs
-the same scenario on a real three-switch topology. Mininet is a system package,
+On a Linux machine with Mininet, `sudo python demo/run_demo.py --mininet` adds
+Cases 3–5 on a real three-switch topology. Mininet is a system package,
 not a pip dependency; the reference environment is the official Mininet VM
 image.
 
@@ -54,6 +55,13 @@ uvicorn verifix.api:app --port 8080
 Started bare, the service has no state provider, so each request must carry
 `live_state` (and `proposal_state`, for `check_once`). A request with neither
 gets a 503 rather than a verdict computed against an invented state.
+
+Caller-supplied state is trusted as given, and it takes precedence over a
+configured provider. So over HTTP the caller, which may be the agent being
+verified, supplies the state it is judged against. Independent live reads
+happen only when the gate runs in-process with a provider such as
+`MininetStateProvider`; nothing in this repository wires one to the HTTP
+server.
 
 ```bash
 curl -X POST localhost:8080/verify -H 'content-type: application/json' -d '{
@@ -98,7 +106,8 @@ never seen. Three rules make that safe:
    verdict of `allow` with 2/6 coverage is a different claim from `allow` with
    6/6, and the API says which one you got.
 3. **A check that raises cannot take the gate down.** It is recorded as `error`
-   and the remaining checks still run.
+   and the remaining checks still run. Any error marks the decision weakly
+   verified whatever the coverage ratio, so `unknown_policy` decides it.
 
 The live-only checks, freshness and state binding, are schema-agnostic: they
 need only a timestamp and a state digest, so they work on any action from any
@@ -111,7 +120,8 @@ the whole state is compared, which works for any agent but blocks on any
 change. The scope is recorded on every result. Declared binding is only as
 good as the declaration: if it names what the action acts on but not why it was
 chosen, a change to the premise passes unseen. An action with no digest at all
-gets `not_applicable`.
+gets `not_applicable`; with the other three checks passing that is 3/4, which
+the default `min_coverage` of 0.5 does not flag. A malformed key is an `error`.
 
 When coverage falls below `min_coverage`, the decision is flagged
 `weakly_verified` and `unknown_policy` decides what to do with it:
@@ -159,19 +169,20 @@ gate and checks run against it. The only environment adapter is
 ## Experiments
 
 ```bash
-python -m experiments.run                    # Cases 1–3, CSV to stdout
+python -m experiments.run                    # Cases 1–2, CSV to stdout
 sudo .venv/bin/python -m experiments.run --mininet --out results/mininet-cases.csv
 python -m experiments.analyse                # Table 2
 ```
 
 Run from the repository root. `--mininet` needs Linux, root and Mininet, and
-stops with an error if Mininet is missing rather than quietly running three
+stops with an error if Mininet is missing rather than quietly running two
 cases.
 
 ## Status
 
 The gate, checks, Mininet adapter, HTTP API and evaluation tooling are built
-and tested. Cases 1–5 run on a real Mininet topology on the Linux VM. There is
+and tested. Cases 1–2 use static state; Cases 3–5 run on one Mininet topology
+on the Linux VM. There is
 no evaluation on real agents' actions: the two network-operations agent
 benchmarks examined (NetArena, NIKA) don't exercise state-changing actions with
 proposal-time state.

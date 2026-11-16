@@ -1,13 +1,13 @@
 """Run Cases 1-5 and append one CSV row per case, variant and mode.
 
-    python -m experiments.run                       # Cases 1-3, CSV to stdout
+    python -m experiments.run                       # Cases 1-2, CSV to stdout
     sudo .venv/bin/python -m experiments.run --mininet \\
         --out results/mininet-cases.csv              # all five, on the VM
 
 Run from the repository root. The cases themselves live in
 experiments/cases.py; this file only turns their decisions into rows.
 
-results/mininet-cases.csv is written only on the VM, because Cases 4-5 need
+results/mininet-cases.csv is written only on the VM, because Cases 3-5 need
 Mininet. Without --out nothing touches results/, which is how this runs on
 a machine that isn't the VM.
 """
@@ -107,7 +107,7 @@ def collect(with_mininet: bool) -> list[Trial]:
         try:
             trials += mininet_trials()
         except ImportError as exc:
-            # Asked for all five cases: silently returning three would make
+            # Asked for all five cases: silently returning two would make
             # the table look complete when it is not.
             raise SystemExit(f"--mininet given but Mininet is unavailable: {exc}")
     return trials
@@ -116,7 +116,7 @@ def collect(with_mininet: bool) -> list[Trial]:
 def main(argv: list[str] | None = None, stdout: TextIO = sys.stdout) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--mininet", action="store_true",
-                        help="also run Cases 4 and 5 (Linux, root, Mininet)")
+                        help="also run Cases 3-5 (Linux, root, Mininet)")
     parser.add_argument("--out", type=Path,
                         help="CSV to append to; omitted, rows go to stdout")
     args = parser.parse_args(argv)

@@ -1,6 +1,6 @@
 """Cases 1-5, the CSV runner, and the demo's recorded evidence.
 
-Cases 4-5 run against a stub with Mininet's link API, so the case logic is
+Cases 3-5 run against a stub with Mininet's link API, so the case logic is
 tested everywhere; only the real-topology run needs the VM.
 """
 
@@ -14,12 +14,14 @@ from pathlib import Path
 import pytest
 
 from experiments import run
-from experiments.cases import Trial, network_trials, static_trials
+from experiments.cases import TRIANGLE_LINKS, Trial, network_trials, static_trials
 from verifix.adapters.mininet import link_id
 from verifix.models import GateMode, Verdict
 
 ROOT = Path(__file__).resolve().parent.parent
-RECORDING = ROOT / "results" / "phase1-demo-2026-11-15.txt"
+# Recorded on the VM with `demo/run_demo.py --mininet`. Supersedes
+# phase1-demo-2026-11-15.txt, which predates h3 and the Mininet Case 3.
+RECORDING = ROOT / "results" / "phase4-demo-2026-11-16.txt"
 
 
 class StubIntf:
@@ -37,11 +39,10 @@ class StubLink:
 
 
 class StubNet:
-    """The triangle from cases.mininet_trials, with Mininet's link toggle."""
+    """The topology from cases.build_triangle, with Mininet's link toggle."""
 
     def __init__(self) -> None:
-        self.links = [StubLink(a, b) for a, b in (
-            ("h1", "s1"), ("s1", "s2"), ("s1", "s3"), ("s3", "s2"), ("s2", "h2"))]
+        self.links = [StubLink(a, b) for a, b in TRIANGLE_LINKS]
 
     def configLinkStatus(self, a: str, b: str, status: str) -> None:
         link = next(lk for lk in self.links
@@ -57,7 +58,8 @@ def _by_variant(trials: list[Trial], case: int) -> dict[str, Trial]:
     return {t.variant: t for t in trials if t.case == case}
 
 
-# Expected verdicts are the ones in the Phase 1 recording, not new claims.
+# Expected verdicts for Cases 1, 2, 4 and 5 are the ones in the Phase 1
+# recording. Case 3's are the static Case 3's, now asserted on the topology.
 
 def test_static_cases_match_the_recording() -> None:
     trials = static_trials(1000.0)
@@ -70,13 +72,23 @@ def test_static_cases_match_the_recording() -> None:
         assert (d.coverage.evaluated, d.coverage.total) == (2, 4)
         assert d.weakly_verified
 
-    case3 = _by_variant(trials, 3)
-    assert case3["whole-state"].decisions[GateMode.REVALIDATE].verdict is Verdict.BLOCK
-    assert case3["declared"].decisions[GateMode.REVALIDATE].verdict is Verdict.ALLOW
+    assert {t.case for t in trials} == {1, 2}
 
 
 def test_network_cases_match_the_recording() -> None:
     trials = network_trials(StubNet())
+    assert {t.adapter for t in trials} == {"mininet"}
+
+    case3 = _by_variant(trials, 3)
+    for variant, verdict, binding in (("whole-state", "block", "fail"),
+                                      ("declared", "allow", "pass")):
+        live = case3[variant].decisions[GateMode.REVALIDATE]
+        status = {c.name: c.status.value for c in live.checks}
+        assert case3[variant].decisions[GateMode.CHECK_ONCE].verdict is Verdict.ALLOW
+        assert (live.verdict.value, status["state_binding"]) == (verdict, binding)
+        # The false block is state binding's alone: the reroute stays feasible.
+        assert status["feasibility"] == "pass"
+
     for trial in _by_variant(trials, 4).values():
         assert _verdicts(trial) == ("allow", "allow", "block")
 
@@ -98,6 +110,7 @@ def test_binding_label_follows_the_action() -> None:
     labels = {(t.case, t.variant): t.binding for t in trials}
     assert labels[(2, "unknown=open")] == "none"
     assert labels[(3, "whole-state")] == "whole"
+    assert labels[(3, "declared")] == "declared"
     assert labels[(5, "declared target only")] == "declared"
 
 
@@ -109,8 +122,8 @@ def _csv_rows(argv: list[str]) -> list[dict[str, str]]:
 
 def test_one_row_per_trial_and_mode() -> None:
     rows = _csv_rows([])
-    # Cases 1-3: 1 + 2 + 2 trials, three modes each.
-    assert len(rows) == 15
+    # Cases 1-2: 1 + 2 trials, three modes each.
+    assert len(rows) == 9
     assert list(rows[0]) == run.COLUMNS
     assert {r["adapter"] for r in rows} == {"static"}
 
@@ -143,7 +156,7 @@ def test_append_writes_one_header_across_runs(tmp_path: Path) -> None:
     lines = out.read_text(encoding="utf-8").splitlines()
     assert sum(1 for line in lines if line.startswith("run_id,")) == 1
     rows = list(csv.DictReader(io.StringIO(out.read_text(encoding="utf-8"))))
-    assert len(rows) == 30 and len({r["run_id"] for r in rows}) == 2
+    assert len(rows) == 18 and len({r["run_id"] for r in rows}) == 2
 
 
 def test_refuses_to_append_under_a_different_header(tmp_path: Path) -> None:
@@ -166,6 +179,10 @@ def test_demo_still_reproduces_the_recorded_evidence(
 ) -> None:
     from demo import run_demo
 
+    if not RECORDING.exists():
+        # Only the VM can make this file, and a recording generated here from
+        # the stub would be evidence of nothing. Skipped visibly until then.
+        pytest.skip(f"{RECORDING.name} not yet recorded on the VM")
     monkeypatch.setattr(run_demo, "mininet_trials", lambda: network_trials(StubNet()))
     monkeypatch.setattr(sys, "argv", ["run_demo.py", "--mininet"])
     run_demo.main()
@@ -195,7 +212,6 @@ def test_table_has_one_row_per_case_and_variant(tmp_path: Path) -> None:
     body = _body(_table(tmp_path))
     assert [(r[0], r[1]) for r in body] == [
         ("1", "whole-state"), ("2", "unknown=open"), ("2", "unknown=closed"),
-        ("3", "whole-state"), ("3", "declared"),
     ]
 
 
@@ -205,6 +221,15 @@ def test_table_keeps_not_run_apart_from_abstained(tmp_path: Path) -> None:
     feasibility, freshness = case2_open[7], case2_open[8]
     assert feasibility == "n/a / n/a"        # ran in both modes, abstained
     assert freshness == "not run / pass"     # never attempted in check_once
+
+
+def test_table_reports_latency_per_mode(tmp_path: Path) -> None:
+    out = tmp_path / "cases.csv"
+    run.main(["--out", str(out)])
+    rows = list(csv.DictReader(out.open(encoding="utf-8")))
+    once = next(r for r in rows if r["case"] == "1" and r["mode"] == "check_once")
+    live = next(r for r in rows if r["case"] == "1" and r["mode"] == "revalidate")
+    assert _body(_table(tmp_path))[0][-1] == f"{once['latency_ms']} / {live['latency_ms']}"
 
 
 def test_table_selects_on_mode_so_off_rows_never_appear(tmp_path: Path) -> None:

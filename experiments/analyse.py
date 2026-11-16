@@ -76,6 +76,7 @@ def table_rows(rows: Iterable[Row]) -> list[list[str]]:
             f"{once['verdict'].upper()} ({once['coverage_evaluated']}/{once['coverage_total']})",
             f"{live['verdict'].upper()} ({live['coverage_evaluated']}/{live['coverage_total']})",
             *(f"{_status(once[c])} / {_status(live[c])}" for c in CHECK_NAMES),
+            f"{once['latency_ms']} / {live['latency_ms']}",
         ])
     return out
 
@@ -85,6 +86,7 @@ def render(run_id: str, rows: list[Row], out: TextIO) -> None:
         "Case", "Variant", "Binding", "Unknown policy",
         "check_once (cov)", "revalidate (cov)",
         *(f"{c} (once / reval)" for c in CHECK_NAMES),
+        "latency ms (once / reval)",
     ]
     adapters = sorted({r["adapter"] for r in rows})
     print(f"Table 2: Mininet cases (run {run_id}, adapters: {', '.join(adapters)})",
@@ -97,7 +99,9 @@ def render(run_id: str, rows: list[Row], out: TextIO) -> None:
     print(file=out)
     print("Coverage is evaluated/total over the checks run in that mode. "
           "'not run' means the mode never attempts the check; 'n/a' means the "
-          "check ran and abstained.", file=out)
+          "check ran and abstained. Latency is one decision's wall time inside "
+          "Gate.verify, state read included: one sample per cell, not a "
+          "distribution.", file=out)
 
 
 def main(argv: list[str] | None = None, stdout: TextIO = sys.stdout) -> None:

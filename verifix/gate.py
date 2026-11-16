@@ -124,7 +124,10 @@ class Gate:
             ],
             errored=[r.name for r in results if r.status is CheckStatus.ERROR],
         )
-        weak = coverage.ratio < self.min_coverage
+        # An errored check is an unknown, not a near-pass. Left to the ratio,
+        # three passes and one error clear any floor up to 0.75 and the action
+        # is allowed under CLOSED too, so an error flags on its own.
+        weak = coverage.ratio < self.min_coverage or bool(coverage.errored)
 
         if any(r.status is CheckStatus.FAIL for r in results):
             verdict = Verdict.BLOCK

@@ -147,11 +147,72 @@ def test_empty_dependency_set_is_not_a_pass() -> None:
 
 
 def test_unresolvable_dependency_key_is_an_error_in_the_gate() -> None:
-    state = NetworkState(captured_at=0.0, links={"l1": True})
-    a = ProposedAction(action_id="b", kind="reroute", proposed_at=0.0,
+    state = NetworkState(captured_at=0.0, links={"l1": True},
+                         paths={"backup": ["l1"]})
+    a = ProposedAction(action_id="b", kind="reroute",
+                       params={"target_path": "backup"}, proposed_at=0.0,
                        state_digest="x", depends_on=["link:l1"])
-    d = Gate(StaticStateProvider(state)).verify(a)
-    assert "state_binding" in d.coverage.errored
+    p = StaticStateProvider(state)
+    opened = Gate(p, unknown_policy=UnknownPolicy.OPEN).verify(a)
+    closed = Gate(p, unknown_policy=UnknownPolicy.CLOSED).verify(a)
+    # 3/4 clears the 0.5 floor; the error must flag on its own, not via ratio.
+    assert (opened.coverage.evaluated, opened.coverage.total) == (3, 4)
+    assert "state_binding" in opened.coverage.errored
+    assert opened.verdict is Verdict.ALLOW and opened.weakly_verified
+    assert closed.verdict is Verdict.BLOCK and closed.weakly_verified
+    assert "errored: state_binding" in opened.reason
+
+
+def test_an_error_flags_even_above_the_coverage_floor(states) -> None:
+    now, before, _ = states
+
+    class Exploding:
+        name = "boom"
+        requires_live_state = False
+        schema_agnostic = True
+        def run(self, action, state):
+            raise RuntimeError("unfamiliar state shape")
+
+    p = StaticStateProvider(live=before, at_proposal=before)
+    # The raising check comes first, so the ones after it must still run.
+    checks = [Exploding(), PolicyCheck(), FeasibilityCheck()]
+    for policy, verdict in ((UnknownPolicy.OPEN, Verdict.ALLOW),
+                            (UnknownPolicy.CLOSED, Verdict.BLOCK)):
+        d = Gate(p, checks=checks, unknown_policy=policy,
+                 min_coverage=0.1).verify(_action(now, before.digest()))
+        assert [c.name for c in d.checks] == ["boom", "policy", "feasibility"]
+        assert [c.status for c in d.checks[1:]] == [CheckStatus.PASS] * 2
+        assert d.weakly_verified and d.verdict is verdict
+        assert d.reason.endswith("errored: boom)")
+
+
+def test_a_failure_reason_still_names_errors(states) -> None:
+    now, before, after = states
+
+    class Exploding:
+        name = "boom"
+        requires_live_state = False
+        schema_agnostic = True
+        def run(self, action, state):
+            raise RuntimeError("x")
+
+    p = StaticStateProvider(live=after)
+    d = Gate(p, checks=[FeasibilityCheck(), Exploding()]).verify(
+        _action(now, before.digest()))
+    assert d.verdict is Verdict.BLOCK
+    assert d.reason.startswith("feasibility:") and d.reason.endswith("errored: boom")
+
+
+def test_state_provider_failure_reason_names_the_error(states) -> None:
+    now, before, _ = states
+    d = Gate(StaticStateProvider(before), mode=GateMode.CHECK_ONCE).verify(
+        _action(now, before.digest()))
+    assert d.weakly_verified and d.verdict is Verdict.ALLOW
+    assert "errored: state_provider" in d.reason
+    closed = Gate(StaticStateProvider(before), mode=GateMode.CHECK_ONCE,
+                  unknown_policy=UnknownPolicy.CLOSED).verify(
+        _action(now, before.digest()))
+    assert closed.verdict is Verdict.BLOCK
 
 
 # --- api ------------------------------------------------------------------
