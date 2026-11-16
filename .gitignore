@@ -15,3 +15,6 @@ venv/
 .DS_Store
 
 # results/ is deliberately NOT ignored: experiment CSVs are research data.
+
+
+paper/
