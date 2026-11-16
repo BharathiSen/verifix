@@ -24,9 +24,12 @@ class GateMode(str, Enum):
     OFF          - no verification. Baseline 1.
     CHECK_ONCE   - verify against the state captured at proposal time. Baseline 2.
     REVALIDATE   - verify against live state read at execution time, and only
-                   that. There is no separate proposal-time pass: an action
-                   whose premises changed is caught by state binding, so a
-                   second pass would add latency without changing a verdict.
+                   that. There is no separate proposal-time pass. Design
+                   rationale, not a measured result: state binding detects
+                   changes to what the decision was bound to, so a second
+                   pass was expected to add latency for little benefit.
+                   Binding only sees what it was bound to: a premise left out
+                   of `depends_on` can change unseen (Case 5, target only).
 
     REVALIDATE's catches over CHECK_ONCE come from two sources, and the paper
     must keep them apart: (1) the same schema-aware checks re-run on newer
