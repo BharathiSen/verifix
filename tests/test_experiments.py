@@ -305,3 +305,88 @@ def test_served_revalidate_reads_live_state() -> None:
         assert api.verify(api.VerifyRequest(action=action)).verdict is Verdict.BLOCK
     finally:
         api.configure(None)
+
+
+# --- /verify holds the action to its own snapshot (audit fix) ----------------
+
+@pytest.fixture
+def live():
+    from experiments import serve
+    from verifix import api
+
+    net = StubNet()
+    api.configure(serve.make_gate(net))
+    yield net
+    api.configure(None)
+
+
+def _refused(action) -> int:
+    from fastapi import HTTPException
+
+    from verifix import api
+
+    with pytest.raises(HTTPException) as exc:
+        api.verify(api.VerifyRequest(action=action))
+    return exc.value.status_code
+
+
+def test_rebinding_to_a_later_snapshot_is_refused(live) -> None:
+    # The audit's reproduction: an off-path change blocks whole-state
+    # binding, so the agent binds to a throwaway snapshot taken after it.
+    from experiments.cases import reroute
+    from verifix import api
+
+    snap = api.snapshot(api.SnapshotRequest(action_id="rb-1"))
+    live.configLinkStatus("h3", "s3", "down")
+    later = api.snapshot(api.SnapshotRequest(action_id="throwaway")).state
+    rebound = reroute("rb-1", snap.state).model_copy(
+        update={"state_digest": later.digest()})
+    assert _refused(rebound) == 400
+    # The honest action, bound to its own snapshot, is judged and blocked.
+    honest = reroute("rb-1", snap.state)
+    assert api.verify(api.VerifyRequest(action=honest)).verdict is Verdict.BLOCK
+
+
+def test_a_proposal_dated_in_the_future_is_refused(live) -> None:
+    from experiments.cases import reroute
+    from verifix import api
+
+    snap = api.snapshot(api.SnapshotRequest(action_id="fu-1"))
+    action = reroute("fu-1", snap.state).model_copy(
+        update={"proposed_at": snap.state.captured_at + 1e6})
+    assert _refused(action) == 400
+
+
+def test_verify_without_a_snapshot_is_refused(live) -> None:
+    from experiments.cases import reroute
+    from verifix import api
+
+    seen = api.snapshot(api.SnapshotRequest(action_id="other")).state
+    assert _refused(reroute("never-snapshotted", seen)) == 409
+
+
+def test_declared_binding_to_its_own_snapshot_passes(live) -> None:
+    from experiments.cases import BACKUP_DEPS, reroute
+    from verifix import api
+
+    snap = api.snapshot(api.SnapshotRequest(action_id="dc-1"))
+    action = reroute("dc-1", snap.state, BACKUP_DEPS)
+    assert api.verify(api.VerifyRequest(action=action)).verdict is Verdict.ALLOW
+
+
+def test_unbound_and_malformed_actions_reach_the_gate_flagged(live) -> None:
+    # Declining to bind, or a key that cannot resolve, is the gate's to
+    # judge: allowed under OPEN but weakly verified, not refused here.
+    from experiments.cases import reroute
+    from verifix import api
+
+    snap = api.snapshot(api.SnapshotRequest(action_id="ub-1")).state
+    unbound = reroute("ub-1", snap).model_copy(update={"state_digest": None})
+    d = api.verify(api.VerifyRequest(action=unbound))
+    assert d.verdict is Verdict.ALLOW and d.weakly_verified
+
+    snap = api.snapshot(api.SnapshotRequest(action_id="mk-1")).state
+    bad = reroute("mk-1", snap).model_copy(
+        update={"depends_on": ["link:s1-s3"], "state_digest": "x"})
+    d = api.verify(api.VerifyRequest(action=bad))
+    assert d.weakly_verified and "state_binding" in d.coverage.errored

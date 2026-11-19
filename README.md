@@ -70,7 +70,12 @@ curl -X POST localhost:8080/verify -H 'content-type: application/json' -d '{
 
 With a provider configured, a `/verify` request that carries `live_state` or
 `proposal_state` gets a 400: an agent that sends the state it is judged
-against can always pass. A repeated snapshot id gets a 409.
+against can always pass. A repeated snapshot id gets a 409. `/verify` also
+holds the action to the snapshot taken for its id: no snapshot gets a 409,
+and a `proposed_at` or `state_digest` that differs from the gate's record
+(for example, a digest from a later snapshot taken under another id) gets a
+400. An action with no digest, or a malformed `depends_on` key, still reaches
+the gate, which flags it.
 
 Started bare (`uvicorn verifix.api:app --port 8080`), the service has no
 provider. Then each request must carry `live_state`, the gate runs
@@ -176,6 +181,7 @@ experiments/
 ├── serve.py           the HTTP server on a live Mininet triangle
 ├── agent.py           an LLM (Groq) proposes remediations; the gate judges them
 ├── inject.py          seeded link churn between proposal and execution
+├── tradeoff.py        false blocks vs silent misses per binding scope
 └── analyse.py         Table 2 from results/mininet-cases-wsl.csv
 demo/run_demo.py       prints a narrative subset of the same cases
 results/               research data, append-only
@@ -208,6 +214,17 @@ without the action vocabulary in the prompt. What the model declares in
 sudo -E ~/verifix-venv/bin/python -m experiments.agent --trials 1 --out results/agent-groq-wsl.csv
 ```
 
+With `--evidence reads` the state is not in the prompt: the model reads it
+through tools (`get_link`, `get_path`) and submits through a `submit` tool.
+The harness logs which keys were read; that list is the inferred dependency
+set. Each action is then judged bound to what it declared, to what it read,
+and to the whole state, on the same drift. Its rows have extra columns, so
+they go to their own file:
+
+```bash
+sudo -E ~/verifix-venv/bin/python -m experiments.agent --evidence reads --trials 1 --out results/agent-inferred-wsl.csv
+```
+
 `experiments/inject.py` replaces the single scripted drift with churn: from
 Case 5's fault, the reroute is proposed under three binding scopes, then
 every link toggles as a seeded Poisson process for a set delay before the
@@ -219,6 +236,18 @@ action was stale.
 
 ```bash
 sudo ~/verifix-venv/bin/python -m experiments.inject --repeats 1 --out results/injection-wsl.csv
+```
+
+`experiments/tradeoff.py` labels those rows and counts each scope's cost.
+An action is stale if its premise is gone (s1-s2 back up) or its target is
+infeasible (a backup link down); an off-path change does not make it stale.
+A false block is a block on a sound action, a silent miss an allow on a
+stale one. Counts are printed below the freshness budget and over all
+delays. `--plot` draws the figure and needs matplotlib (the `plot` extra);
+the tables need nothing extra.
+
+```bash
+python -m experiments.tradeoff --plot        # results/tradeoff-wsl.png
 ```
 
 ## Status

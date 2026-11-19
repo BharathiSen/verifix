@@ -32,9 +32,9 @@ class GateMode(str, Enum):
                    of `depends_on` can change unseen (Case 5, target only).
 
     REVALIDATE's catches over CHECK_ONCE come from two sources, and the paper
-    must keep them apart: (1) the same schema-aware checks re-run on newer
-    state, and (2) the live-only checks (freshness, state binding), which have
-    nothing to say in CHECK_ONCE. Per-check status on every Decision is what
+    must keep them apart: (1) the checks CHECK_ONCE also runs (policy,
+    feasibility) re-run on newer state, and (2) the live-only checks
+    (freshness, state binding), which have nothing to say in CHECK_ONCE. Per-check status on every Decision is what
     lets results attribute a block to one or the other.
     """
 

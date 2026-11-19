@@ -1,8 +1,9 @@
-"""Schema-aware checks: feasibility and policy.
+"""The checks that look at the action itself: feasibility and policy.
 
-These need to understand what the action means, so on an unfamiliar
-environment they report NOT_APPLICABLE rather than pretending to approve.
-Keep them deliberately simple. Run against live state in REVALIDATE, they are
+Feasibility is schema-aware: it needs to understand what the action means,
+so on an unfamiliar kind it reports NOT_APPLICABLE rather than pretending to
+approve. Policy reads only the kind, which every action has, so it is
+flagged schema-agnostic and never abstains. Keep both deliberately simple. Run against live state in REVALIDATE, they are
 also one of the two sources of REVALIDATE's catches (see GateMode), so a block
 they cause there is a staleness catch even though they are not live-only.
 """

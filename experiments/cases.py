@@ -134,11 +134,12 @@ def case_binding_scope(net: Any, provider: MininetStateProvider) -> list[Trial]:
     declared = reroute("mn3-declared", provider.snapshot("mn3-declared"),
                        BACKUP_DEPS)
     net.configLinkStatus("h3", "s3", "down")
-    trials = [decide(3, label, "mininet", provider, action)
-              for label, action in (("whole-state", whole),
-                                    ("declared", declared))]
-    net.configLinkStatus("h3", "s3", "up")  # restore for Case 4
-    return trials
+    try:
+        return [decide(3, label, "mininet", provider, action)
+                for label, action in (("whole-state", whole),
+                                      ("declared", declared))]
+    finally:
+        net.configLinkStatus("h3", "s3", "up")  # restore for Case 4
 
 
 def case_target_drops(net: Any, provider: MininetStateProvider) -> list[Trial]:
@@ -147,11 +148,12 @@ def case_target_drops(net: Any, provider: MininetStateProvider) -> list[Trial]:
     declared = reroute("mn4-declared", provider.snapshot("mn4-declared"),
                        BACKUP_DEPS)
     net.configLinkStatus("s1", "s3", "down")
-    trials = [decide(4, label, "mininet", provider, action)
-              for label, action in (("whole-state", whole),
-                                    ("declared", declared))]
-    net.configLinkStatus("s1", "s3", "up")  # restore for Case 5
-    return trials
+    try:
+        return [decide(4, label, "mininet", provider, action)
+                for label, action in (("whole-state", whole),
+                                      ("declared", declared))]
+    finally:
+        net.configLinkStatus("s1", "s3", "up")  # restore for Case 5
 
 
 def case_premise_recovers(

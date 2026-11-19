@@ -7,8 +7,11 @@ Who supplies the state matters more than anything else here. With a provider
 configured (experiments/serve.py), the gate reads state itself and refuses
 state sent by the caller: the caller may be the agent under verification, and
 an agent that picks the state it is judged against can always pass. The agent
-gets its proposal-time state from POST /snapshot, so even the digest it binds
-to comes from the gate's own read.
+gets its proposal-time state from POST /snapshot, and /verify holds the
+action to that snapshot: its `proposed_at` and `state_digest` must be the
+ones the gate recorded for its id. Otherwise an agent could bind to a later
+snapshot taken under another id, or date its proposal in the future, and
+pass state binding and freshness on its own say-so.
 """
 
 from __future__ import annotations
@@ -64,6 +67,7 @@ def _gate_for(req: VerifyRequest) -> Gate:
                 status_code=400,
                 detail="this server reads state itself; caller-supplied state is refused",
             )
+        _hold_to_snapshot(_gate, req.action)
         return _gate
     if req.live_state is None:
         # Verifying against an invented empty state would return a decision
@@ -74,6 +78,46 @@ def _gate_for(req: VerifyRequest) -> Gate:
         )
     provider = StaticStateProvider(req.live_state, at_proposal=req.proposal_state)
     return Gate(state_provider=provider, mode=GateMode.REVALIDATE)
+
+
+def _hold_to_snapshot(gate: Gate, action: ProposedAction) -> None:
+    """Refuse an action whose binding fields are not the gate's own record.
+
+    Only for providers that take snapshots: one that cannot has no record to
+    hold the action to, and its state is the operator's, not the caller's.
+    """
+    if getattr(gate.state_provider, "snapshot", None) is None:
+        return
+    try:
+        recorded = gate.state_provider.state_at_proposal(action)
+    except LookupError:
+        # Without the gate's record, proposed_at and state_digest are the
+        # caller's word alone. Refused rather than judged unbound: an agent
+        # could otherwise skip /snapshot and set its own clock.
+        raise HTTPException(
+            status_code=409,
+            detail=f"no snapshot for action {action.action_id!r}; "
+                   f"call /snapshot first",
+        ) from None
+    if action.proposed_at != recorded.captured_at:
+        raise HTTPException(
+            status_code=400,
+            detail="proposed_at differs from the snapshot taken for this action",
+        )
+    if action.state_digest is None:
+        return  # declining to bind is the gate's to flag, not this layer's
+    try:
+        expected = recorded.digest(action.depends_on)
+    except ValueError:
+        # A malformed key: state binding errors on it in the gate, and the
+        # decision is flagged there. Nothing here to compare against.
+        return
+    if action.state_digest != expected:
+        raise HTTPException(
+            status_code=400,
+            detail="state_digest is not the digest of the snapshot taken for "
+                   "this action over its depends_on",
+        )
 
 
 @app.post("/verify", response_model=Decision)

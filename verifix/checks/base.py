@@ -6,12 +6,13 @@ here and registering it - no changes to the gate.
 Checks come in two kinds, and the split is what lets VeriFix run on an
 environment it has never seen:
 
-  schema-agnostic  - needs only a timestamp, a state digest and (optionally)
-                     the action's declared dependencies, so it works on any
-                     action from any environment (freshness, state binding)
+  schema-agnostic  - needs only what every action carries, so it works on
+                     any action from any environment: a timestamp, a state
+                     digest and the declared dependencies (freshness, state
+                     binding), or just the kind (policy, a deny-list)
   schema-aware     - needs to understand the action's fields, so it reports
                      NOT_APPLICABLE on action kinds it does not know
-                     (feasibility, policy)
+                     (feasibility)
 
 A schema-aware check must never return PASS for something it did not actually
 evaluate. That is the difference between a gate that degrades and a gate that
