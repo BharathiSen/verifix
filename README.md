@@ -175,6 +175,7 @@ experiments/
 ├── run.py             one CSV row per case, variant and mode
 ├── serve.py           the HTTP server on a live Mininet triangle
 ├── agent.py           an LLM (Groq) proposes remediations; the gate judges them
+├── inject.py          seeded link churn between proposal and execution
 └── analyse.py         Table 2 from results/mininet-cases-wsl.csv
 demo/run_demo.py       prints a narrative subset of the same cases
 results/               research data, append-only
@@ -205,6 +206,19 @@ without the action vocabulary in the prompt. What the model declares in
 
 ```bash
 sudo -E ~/verifix-venv/bin/python -m experiments.agent --trials 1 --out results/agent-groq-wsl.csv
+```
+
+`experiments/inject.py` replaces the single scripted drift with churn: from
+Case 5's fault, the reroute is proposed under three binding scopes, then
+every link toggles as a seeded Poisson process for a set delay before the
+gate decides. The grid is delays 0.5–8 s (8 s is past the freshness budget)
+by rates 0–0.2 toggles per link per second. Time is simulated (the
+provider's clock is advanced, nothing sleeps); the link changes are real.
+Each row logs the events and which links ended changed, not whether the
+action was stale.
+
+```bash
+sudo ~/verifix-venv/bin/python -m experiments.inject --repeats 1 --out results/injection-wsl.csv
 ```
 
 ## Status
