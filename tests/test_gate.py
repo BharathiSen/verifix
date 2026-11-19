@@ -252,23 +252,48 @@ def configured():
     api.configure(None)
 
 
-def test_api_override_keeps_unknown_policy(states, configured) -> None:
-    now, _, _ = states
-    opaque = NetworkState(captured_at=now)
-    configured(Gate(StaticStateProvider(opaque), unknown_policy=UnknownPolicy.CLOSED,
-                    min_coverage=0.6))
-    req = api.VerifyRequest(action=_action(now, kind="never_seen"), live_state=opaque)
-    assert api.verify(req).verdict is Verdict.BLOCK
-
-
-def test_api_check_once_without_proposal_state_errors(states, configured) -> None:
+@pytest.mark.parametrize("field", ["live_state", "proposal_state"])
+def test_api_configured_refuses_caller_state(states, configured, field) -> None:
+    # The trust hole: an agent that sends the state it is judged against can
+    # always pass. With a provider configured, any such request is refused.
     now, before, after = states
-    configured(Gate(StaticStateProvider(before), mode=GateMode.CHECK_ONCE))
-    req = api.VerifyRequest(action=_action(now, before.digest()), live_state=after)
-    d = api.verify(req)
-    assert d.coverage.errored == ["state_provider"]
-    req.proposal_state = before
-    assert api.verify(req).checks[0].status is not CheckStatus.ERROR
+    configured(Gate(StaticStateProvider(after)))
+    req = api.VerifyRequest(action=_action(now, before.digest()), **{field: before})
+    with pytest.raises(HTTPException) as exc:
+        api.verify(req)
+    assert exc.value.status_code == 400
+
+
+def test_api_configured_judges_against_provider(states, configured) -> None:
+    now, before, after = states
+    configured(Gate(StaticStateProvider(after)))
+    d = api.verify(api.VerifyRequest(action=_action(now, before.digest())))
+    # The provider's state (backup down), not anything the caller claimed.
+    assert d.verdict is Verdict.BLOCK
+
+
+def test_api_unconfigured_uses_caller_state(states) -> None:
+    api.configure(None)
+    now, before, after = states
+    d = api.verify(api.VerifyRequest(action=_action(now, before.digest()),
+                                     live_state=before))
+    assert d.verdict is Verdict.ALLOW
+    assert d.mode is GateMode.REVALIDATE
+
+
+def test_api_snapshot_unconfigured_refuses() -> None:
+    api.configure(None)
+    with pytest.raises(HTTPException) as exc:
+        api.snapshot(api.SnapshotRequest(action_id="a"))
+    assert exc.value.status_code == 503
+
+
+def test_api_snapshot_needs_a_provider_that_takes_them(states, configured) -> None:
+    _, before, _ = states
+    configured(Gate(StaticStateProvider(before)))
+    with pytest.raises(HTTPException) as exc:
+        api.snapshot(api.SnapshotRequest(action_id="a"))
+    assert exc.value.status_code == 501
 
 
 def test_api_unconfigured_without_state_refuses() -> None:

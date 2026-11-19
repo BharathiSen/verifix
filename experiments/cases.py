@@ -189,7 +189,8 @@ def network_trials(net: Any) -> list[Trial]:
 
 
 #: The topology's links, in the order they are added. The test stub reads
-#: this too, so the stub and the VM cannot drift apart.
+#: this too, so the stub and the real topology cannot drift
+#: apart.
 TRIANGLE_LINKS = (("h1", "s1"), ("s1", "s2"), ("s1", "s3"), ("s3", "s2"),
                   ("s2", "h2"), ("h3", "s3"))
 
@@ -216,7 +217,7 @@ def build_triangle() -> Any:
 
     # No controller: the cases read link state and forward no traffic. What
     # the switches do with frames in that state depends on their OVS fail
-    # mode, which is recorded from the VM rather than assumed here.
+    # mode, which is recorded from WSL2 rather than assumed here.
     return Mininet(topo=Triangle(), controller=None)
 
 

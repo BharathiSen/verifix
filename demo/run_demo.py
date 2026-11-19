@@ -14,9 +14,7 @@ Case 5 (--mininet): the primary recovers before execution. The backup is still
 
 The cases are defined in experiments/cases.py. This file only prints them,
 and it prints a subset on purpose: results/phase4-demo-2026-11-16.txt is the
-recorded evidence, and the demo must keep reproducing it. It supersedes
-results/phase1-demo-2026-11-15.txt, recorded when Case 3 was static and the
-topology had no h3.
+recorded evidence, and the demo must keep reproducing it.
 """
 
 from __future__ import annotations

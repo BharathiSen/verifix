@@ -4,7 +4,7 @@ This module never imports Mininet. It reads a `net` object handed to it
 (`net.links`, each link's two interfaces, `intf.isUp()`), so it and its tests
 run anywhere; only the process that builds the topology needs Mininet and
 root. That split is deliberate: the adapter is developed on any machine, and
-the real topology runs on the Linux VM.
+the real topology runs under WSL2.
 
 Mininet has no notion of a path, so candidate paths are supplied by whoever
 built the topology, as lists of link ids.

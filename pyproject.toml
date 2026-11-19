@@ -5,6 +5,11 @@ description = "A verification sidecar for AI agents that act on networks"
 requires-python = ">=3.10"
 dependencies = ["pydantic>=2.0", "fastapi>=0.110", "uvicorn>=0.27"]
 
+[project.optional-dependencies]
+# experiments/agent.py only: an LLM on Groq proposes the actions (Phase 7).
+# Optional because the gate itself never calls a model.
+agent = ["groq>=1.7"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

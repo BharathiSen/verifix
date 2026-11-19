@@ -44,25 +44,39 @@ and execution, and shows the three modes disagreeing:
 On a Linux machine with Mininet, `sudo python demo/run_demo.py --mininet` adds
 Cases 3–5 on a real three-switch topology. Mininet is a system package,
 not a pip dependency; the reference environment is Ubuntu 22.04 under WSL2
-with apt's `mininet` and `openvswitch-switch` (earlier runs used the official
-Mininet VM image).
+with apt's `mininet` and `openvswitch-switch`.
 
 ## Run as a service
 
+Against a live network, the gate reads state itself:
+
 ```bash
-uvicorn verifix.api:app --port 8080
+sudo ~/verifix-venv/bin/python -m experiments.serve            # Linux, Mininet
 ```
 
-Started bare, the service has no state provider, so each request must carry
-`live_state` (and `proposal_state`, for `check_once`). A request with neither
-gets a 503 rather than a verdict computed against an invented state.
+This builds the Mininet triangle, gives the gate a `MininetStateProvider`,
+and serves on `127.0.0.1:8080` (`--mode`, `--unknown-policy`, `--host`,
+`--port`). The agent asks the gate for its proposal-time state and binds its
+action to the digest it gets back, so the agent never supplies state:
 
-Caller-supplied state is trusted as given, and it takes precedence over a
-configured provider. So over HTTP the caller, which may be the agent being
-verified, supplies the state it is judged against. Independent live reads
-happen only when the gate runs in-process with a provider such as
-`MininetStateProvider`; nothing in this repository wires one to the HTTP
-server.
+```bash
+curl -X POST localhost:8080/snapshot -H 'content-type: application/json' \
+     -d '{"action_id": "a-001"}'     # -> {"action_id", "digest", "state"}
+curl -X POST localhost:8080/verify -H 'content-type: application/json' -d '{
+  "action": {"action_id": "a-001", "kind": "reroute",
+             "params": {"target_path": "backup"},
+             "proposed_at": <state.captured_at>, "state_digest": "<digest>"}}'
+```
+
+With a provider configured, a `/verify` request that carries `live_state` or
+`proposal_state` gets a 400: an agent that sends the state it is judged
+against can always pass. A repeated snapshot id gets a 409.
+
+Started bare (`uvicorn verifix.api:app --port 8080`), the service has no
+provider. Then each request must carry `live_state`, the gate runs
+`revalidate`, and `/snapshot` returns 503. A request with no state gets a 503
+rather than a verdict computed against an invented state. This mode trusts the
+caller and is for tests and offline use:
 
 ```bash
 curl -X POST localhost:8080/verify -H 'content-type: application/json' -d '{
@@ -148,7 +162,7 @@ little without "and could evaluate 90% of them."
 verifix/
 ├── models.py          shared types across the API boundary
 ├── gate.py            runs checks according to mode
-├── api.py             POST /verify
+├── api.py             POST /verify, POST /snapshot
 ├── checks/
 │   ├── base.py        the Check interface — add a file to add a check
 │   ├── freshness.py   staleness + state binding (live-only)
@@ -159,6 +173,8 @@ verifix/
 experiments/
 ├── cases.py           Cases 1–5, the single definition
 ├── run.py             one CSV row per case, variant and mode
+├── serve.py           the HTTP server on a live Mininet triangle
+├── agent.py           an LLM (Groq) proposes remediations; the gate judges them
 └── analyse.py         Table 2 from results/mininet-cases-wsl.csv
 demo/run_demo.py       prints a narrative subset of the same cases
 results/               research data, append-only
@@ -180,11 +196,22 @@ Run from the repository root. `--mininet` needs Linux, root and Mininet, and
 stops with an error if Mininet is missing rather than quietly running two
 cases.
 
+`experiments/agent.py` puts an LLM in the proposer's seat (needs
+`pip install groq` and `GROQ_API_KEY`; under sudo, use `sudo -E`). Each
+trial takes s1-s2 down, asks the model for one action, applies one drift
+(none, target drops, premise recovers) and records all three modes, with and
+without the action vocabulary in the prompt. What the model declares in
+`depends_on` is recorded as given.
+
+```bash
+sudo -E ~/verifix-venv/bin/python -m experiments.agent --trials 1 --out results/agent-groq-wsl.csv
+```
+
 ## Status
 
 The gate, checks, Mininet adapter, HTTP API and evaluation tooling are built
 and tested. Cases 1–2 use static state; Cases 3–5 run on one Mininet topology
-under WSL2. There is
-no evaluation on real agents' actions: the two network-operations agent
-benchmarks examined (NetArena, NIKA) don't exercise state-changing actions with
-proposal-time state.
+under WSL2. The two
+network-operations agent benchmarks examined (NetArena, NIKA) don't exercise
+state-changing actions with proposal-time state; LLM-proposed actions come
+from `experiments/agent.py` instead, on the same topology.

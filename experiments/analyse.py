@@ -1,7 +1,7 @@
 """Table 2: the Mininet cases, one row per case and variant.
 
     python -m experiments.analyse                    # latest run in the file
-    python -m experiments.analyse --run af3c319058e0
+    python -m experiments.analyse --run aed06729d553
 
 Reads results/mininet-cases-wsl.csv and prints a Markdown table. Table 1 (real
 agent actions) was withdrawn with NIKA, so this is the only table; ask
@@ -23,8 +23,6 @@ from typing import TextIO
 
 from experiments.run import CHECK_NAMES, COLUMNS, NOT_RUN
 
-# WSL2 replaced the VM on 2026-11-19; the VM's runs stay in
-# results/mininet-cases.csv, frozen, and are read with --csv.
 DEFAULT_CSV = Path("results/mininet-cases-wsl.csv")
 TABLE_MODES = ("check_once", "revalidate")
 

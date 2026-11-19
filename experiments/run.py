@@ -8,9 +8,8 @@ Run from the repository root. The cases themselves live in
 experiments/cases.py; this file only turns their decisions into rows.
 
 results/mininet-cases-wsl.csv is written only under WSL2, because Cases 3-5
-need Mininet; results/mininet-cases.csv holds the retired VM's runs and is
-no longer written. Without --out nothing touches results/, which is how this
-runs on plain Windows.
+need Mininet. Without --out nothing touches results/, which is how this runs
+on plain Windows.
 """
 
 from __future__ import annotations
@@ -82,21 +81,23 @@ def existing_header(path: Path) -> list[str] | None:
         return next(csv.reader(f), None)
 
 
-def append(path: Path, records: list[dict[str, object]]) -> None:
+def append(path: Path, records: list[dict[str, object]],
+           columns: list[str] = COLUMNS) -> None:
     header = existing_header(path)
-    if header is not None and header != COLUMNS:
+    if header is not None and header != columns:
         # The file is append-only research data. Mixing two schemas in it
         # would only be noticed while writing the paper, so refuse now.
         raise SystemExit(
             f"refusing to append to {path}: its header does not match this "
-            f"runner's columns.\n  file:   {header}\n  runner: {COLUMNS}"
+            f"runner's columns.\n  file:   {header}\n  runner: {columns}"
         )
     with path.open("a", newline="", encoding="utf-8") as f:
-        write(f, records, with_header=header is None)
+        write(f, records, with_header=header is None, columns=columns)
 
 
-def write(out: TextIO, records: list[dict[str, object]], with_header: bool) -> None:
-    writer = csv.DictWriter(out, fieldnames=COLUMNS)
+def write(out: TextIO, records: list[dict[str, object]], with_header: bool,
+          columns: list[str] = COLUMNS) -> None:
+    writer = csv.DictWriter(out, fieldnames=columns)
     if with_header:
         writer.writeheader()
     writer.writerows(records)

@@ -1,7 +1,7 @@
 """Cases 1-5, the CSV runner, and the demo's recorded evidence.
 
 Cases 3-5 run against a stub with Mininet's link API, so the case logic is
-tested everywhere; only the real-topology run needs the VM.
+tested everywhere; only the real-topology run needs Mininet (WSL2).
 """
 
 from __future__ import annotations
@@ -19,8 +19,7 @@ from verifix.adapters.mininet import link_id
 from verifix.models import GateMode, Verdict
 
 ROOT = Path(__file__).resolve().parent.parent
-# Recorded on the VM with `demo/run_demo.py --mininet`. Supersedes
-# phase1-demo-2026-11-15.txt, which predates h3 and the Mininet Case 3.
+# Recorded under WSL2 with `demo/run_demo.py --mininet`.
 RECORDING = ROOT / "results" / "phase4-demo-2026-11-16.txt"
 
 
@@ -180,9 +179,9 @@ def test_demo_still_reproduces_the_recorded_evidence(
     from demo import run_demo
 
     if not RECORDING.exists():
-        # Only the VM can make this file, and a recording generated here from
+        # Only real Mininet can make this file, and a recording generated here from
         # the stub would be evidence of nothing. Skipped visibly until then.
-        pytest.skip(f"{RECORDING.name} not yet recorded on the VM")
+        pytest.skip(f"{RECORDING.name} not yet recorded under WSL2")
     monkeypatch.setattr(run_demo, "mininet_trials", lambda: network_trials(StubNet()))
     monkeypatch.setattr(sys, "argv", ["run_demo.py", "--mininet"])
     run_demo.main()
@@ -258,3 +257,51 @@ def test_analyse_refuses_a_foreign_schema(tmp_path: Path) -> None:
     (tmp_path / "cases.csv").write_text("run_id,verdict\nx,allow\n", encoding="utf-8")
     with pytest.raises(SystemExit, match="header does not match"):
         _table(tmp_path)
+
+
+# --- serving a live network (experiments/serve.py, verifix/api.py) ---------
+
+@pytest.fixture
+def served():
+    from experiments import serve
+    from verifix import api
+
+    net = StubNet()
+    api.configure(serve.make_gate(net, GateMode.CHECK_ONCE))
+    yield net
+    api.configure(None)
+
+
+def test_snapshot_binds_to_the_gates_own_read(served) -> None:
+    from fastapi import HTTPException
+
+    from experiments.cases import BACKUP_DEPS, reroute
+    from verifix import api
+
+    snap = api.snapshot(api.SnapshotRequest(action_id="s-1"))
+    assert snap.digest == snap.state.digest()
+    with pytest.raises(HTTPException) as exc:
+        api.snapshot(api.SnapshotRequest(action_id="s-1"))
+    assert exc.value.status_code == 409
+    # The backup drops after the snapshot. CHECK_ONCE judges the snapshot the
+    # gate took, so it allows; the agent never supplied any state.
+    served.configLinkStatus("s1", "s3", "down")
+    action = reroute("s-1", snap.state, BACKUP_DEPS)
+    assert api.verify(api.VerifyRequest(action=action)).verdict is Verdict.ALLOW
+
+
+def test_served_revalidate_reads_live_state() -> None:
+    from experiments import serve
+    from experiments.cases import reroute
+    from verifix import api
+
+    net = StubNet()
+    api.configure(serve.make_gate(net))
+    try:
+        snap = api.snapshot(api.SnapshotRequest(action_id="s-2"))
+        action = reroute("s-2", snap.state)
+        assert api.verify(api.VerifyRequest(action=action)).verdict is Verdict.ALLOW
+        net.configLinkStatus("s1", "s3", "down")
+        assert api.verify(api.VerifyRequest(action=action)).verdict is Verdict.BLOCK
+    finally:
+        api.configure(None)
