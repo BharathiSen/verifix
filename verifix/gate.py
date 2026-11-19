@@ -127,7 +127,17 @@ class Gate:
         # An errored check is an unknown, not a near-pass. Left to the ratio,
         # three passes and one error clear any floor up to 0.75 and the action
         # is allowed under CLOSED too, so an error flags on its own.
-        weak = coverage.ratio < self.min_coverage or bool(coverage.errored)
+        # A schema-agnostic check needs only what every action is expected to
+        # carry, so its abstaining means the action withheld that (in
+        # practice: no state digest, or an empty depends_on). Left to the
+        # ratio, that is 3/4 and passes unflagged, so an agent could opt out
+        # of state binding just by not binding. It flags on its own too.
+        withheld = [
+            r.name for c, r in zip(active, results)
+            if c.schema_agnostic and r.status is CheckStatus.NOT_APPLICABLE
+        ]
+        weak = (coverage.ratio < self.min_coverage or bool(coverage.errored)
+                or bool(withheld))
 
         if any(r.status is CheckStatus.FAIL for r in results):
             verdict = Verdict.BLOCK

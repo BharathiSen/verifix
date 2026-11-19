@@ -1,0 +1,61 @@
+run_id,timestamp,adapter,case,variant,mode,binding,unknown_policy,min_coverage,action_id,verdict,policy,feasibility,freshness,state_binding,coverage_evaluated,coverage_total,weakly_verified,latency_ms,reason
+aed06729d553,2026-11-19T06:16:48+00:00,static,1,whole-state,off,whole,open,0.5,a-001,allow,not_run,not_run,not_run,not_run,0,0,False,0.006,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,static,1,whole-state,check_once,whole,open,0.5,a-001,allow,pass,pass,not_run,not_run,2,2,False,0.062,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,static,1,whole-state,revalidate,whole,open,0.5,a-001,block,pass,fail,pass,fail,4,4,False,0.366,"feasibility: path 'backup' has down links: r3-r4; state_binding: whole-state: state changed since proposal (decided against 13677c7492054654, now d05351a103624628)"
+aed06729d553,2026-11-19T06:16:48+00:00,static,2,unknown=open,off,none,open,0.6,a-002,allow,not_run,not_run,not_run,not_run,0,0,False,0.001,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,static,2,unknown=open,check_once,none,open,0.6,a-002,allow,pass,not_applicable,not_run,not_run,1,2,True,0.025,weakly verified: only 1/2 checks applied (skipped: feasibility)
+aed06729d553,2026-11-19T06:16:48+00:00,static,2,unknown=open,revalidate,none,open,0.6,a-002,allow,pass,not_applicable,pass,not_applicable,2,4,True,0.025,"weakly verified: only 2/4 checks applied (skipped: feasibility, state_binding)"
+aed06729d553,2026-11-19T06:16:48+00:00,static,2,unknown=closed,off,none,closed,0.6,a-002,allow,not_run,not_run,not_run,not_run,0,0,False,0.001,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,static,2,unknown=closed,check_once,none,closed,0.6,a-002,block,pass,not_applicable,not_run,not_run,1,2,True,0.018,weakly verified: only 1/2 checks applied (skipped: feasibility)
+aed06729d553,2026-11-19T06:16:48+00:00,static,2,unknown=closed,revalidate,none,closed,0.6,a-002,block,pass,not_applicable,pass,not_applicable,2,4,True,0.042,"weakly verified: only 2/4 checks applied (skipped: feasibility, state_binding)"
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,3,whole-state,off,whole,open,0.5,mn3-whole,allow,not_run,not_run,not_run,not_run,0,0,False,0.014,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,3,whole-state,check_once,whole,open,0.5,mn3-whole,allow,pass,pass,not_run,not_run,2,2,False,0.245,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,3,whole-state,revalidate,whole,open,0.5,mn3-whole,block,pass,pass,pass,fail,4,4,False,48.077,"state_binding: whole-state: state changed since proposal (decided against 5596bd47754bee38, now 34558dcc63430d3f)"
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,3,declared,off,declared,open,0.5,mn3-declared,allow,not_run,not_run,not_run,not_run,0,0,False,0.003,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,3,declared,check_once,declared,open,0.5,mn3-declared,allow,pass,pass,not_run,not_run,2,2,False,0.301,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,3,declared,revalidate,declared,open,0.5,mn3-declared,allow,pass,pass,pass,pass,4,4,False,47.208,4/4 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,4,whole-state,off,whole,open,0.5,mn4-whole,allow,not_run,not_run,not_run,not_run,0,0,False,0.008,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,4,whole-state,check_once,whole,open,0.5,mn4-whole,allow,pass,pass,not_run,not_run,2,2,False,0.298,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,4,whole-state,revalidate,whole,open,0.5,mn4-whole,block,pass,fail,pass,fail,4,4,False,45.046,"feasibility: path 'backup' has down links: s1-s3; state_binding: whole-state: state changed since proposal (decided against 5596bd47754bee38, now 14ca817c5b6d0526)"
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,4,declared,off,declared,open,0.5,mn4-declared,allow,not_run,not_run,not_run,not_run,0,0,False,0.003,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,4,declared,check_once,declared,open,0.5,mn4-declared,allow,pass,pass,not_run,not_run,2,2,False,0.152,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,4,declared,revalidate,declared,open,0.5,mn4-declared,block,pass,fail,pass,fail,4,4,False,44.815,"feasibility: path 'backup' has down links: s1-s3; state_binding: declared (3 keys): state changed since proposal (decided against 644b384082822f1b, now 2594139a60301e98)"
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,whole-state,off,whole,open,0.5,mn5-0,allow,not_run,not_run,not_run,not_run,0,0,False,0.005,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,whole-state,check_once,whole,open,0.5,mn5-0,allow,pass,pass,not_run,not_run,2,2,False,0.138,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,whole-state,revalidate,whole,open,0.5,mn5-0,block,pass,pass,pass,fail,4,4,False,48.926,"state_binding: whole-state: state changed since proposal (decided against 5e11df522f195047, now 5596bd47754bee38)"
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,declared target only,off,declared,open,0.5,mn5-1,allow,not_run,not_run,not_run,not_run,0,0,False,0.005,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,declared target only,check_once,declared,open,0.5,mn5-1,allow,pass,pass,not_run,not_run,2,2,False,0.130,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,declared target only,revalidate,declared,open,0.5,mn5-1,allow,pass,pass,pass,pass,4,4,False,47.968,4/4 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,declared premise+target,off,declared,open,0.5,mn5-2,allow,not_run,not_run,not_run,not_run,0,0,False,0.001,verification disabled
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,declared premise+target,check_once,declared,open,0.5,mn5-2,allow,pass,pass,not_run,not_run,2,2,False,0.081,2/2 checks passed
+aed06729d553,2026-11-19T06:16:48+00:00,mininet,5,declared premise+target,revalidate,declared,open,0.5,mn5-2,block,pass,pass,pass,fail,4,4,False,48.035,"state_binding: declared (4 keys): state changed since proposal (decided against 04cd1aedc9f075cf, now d88d5169ec36aa50)"
+a78213d8a594,2026-11-19T06:18:21+00:00,static,1,whole-state,off,whole,open,0.5,a-001,allow,not_run,not_run,not_run,not_run,0,0,False,0.005,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,static,1,whole-state,check_once,whole,open,0.5,a-001,allow,pass,pass,not_run,not_run,2,2,False,0.059,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,static,1,whole-state,revalidate,whole,open,0.5,a-001,block,pass,fail,pass,fail,4,4,False,0.356,"feasibility: path 'backup' has down links: r3-r4; state_binding: whole-state: state changed since proposal (decided against 13677c7492054654, now d05351a103624628)"
+a78213d8a594,2026-11-19T06:18:21+00:00,static,2,unknown=open,off,none,open,0.6,a-002,allow,not_run,not_run,not_run,not_run,0,0,False,0.001,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,static,2,unknown=open,check_once,none,open,0.6,a-002,allow,pass,not_applicable,not_run,not_run,1,2,True,0.065,weakly verified: only 1/2 checks applied (skipped: feasibility)
+a78213d8a594,2026-11-19T06:18:21+00:00,static,2,unknown=open,revalidate,none,open,0.6,a-002,allow,pass,not_applicable,pass,not_applicable,2,4,True,0.029,"weakly verified: only 2/4 checks applied (skipped: feasibility, state_binding)"
+a78213d8a594,2026-11-19T06:18:21+00:00,static,2,unknown=closed,off,none,closed,0.6,a-002,allow,not_run,not_run,not_run,not_run,0,0,False,0.001,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,static,2,unknown=closed,check_once,none,closed,0.6,a-002,block,pass,not_applicable,not_run,not_run,1,2,True,0.019,weakly verified: only 1/2 checks applied (skipped: feasibility)
+a78213d8a594,2026-11-19T06:18:21+00:00,static,2,unknown=closed,revalidate,none,closed,0.6,a-002,block,pass,not_applicable,pass,not_applicable,2,4,True,0.031,"weakly verified: only 2/4 checks applied (skipped: feasibility, state_binding)"
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,3,whole-state,off,whole,open,0.5,mn3-whole,allow,not_run,not_run,not_run,not_run,0,0,False,0.016,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,3,whole-state,check_once,whole,open,0.5,mn3-whole,allow,pass,pass,not_run,not_run,2,2,False,0.218,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,3,whole-state,revalidate,whole,open,0.5,mn3-whole,block,pass,pass,pass,fail,4,4,False,46.158,"state_binding: whole-state: state changed since proposal (decided against 5596bd47754bee38, now 34558dcc63430d3f)"
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,3,declared,off,declared,open,0.5,mn3-declared,allow,not_run,not_run,not_run,not_run,0,0,False,0.003,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,3,declared,check_once,declared,open,0.5,mn3-declared,allow,pass,pass,not_run,not_run,2,2,False,0.119,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,3,declared,revalidate,declared,open,0.5,mn3-declared,allow,pass,pass,pass,pass,4,4,False,45.189,4/4 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,4,whole-state,off,whole,open,0.5,mn4-whole,allow,not_run,not_run,not_run,not_run,0,0,False,0.010,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,4,whole-state,check_once,whole,open,0.5,mn4-whole,allow,pass,pass,not_run,not_run,2,2,False,0.251,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,4,whole-state,revalidate,whole,open,0.5,mn4-whole,block,pass,fail,pass,fail,4,4,False,43.926,"feasibility: path 'backup' has down links: s1-s3; state_binding: whole-state: state changed since proposal (decided against 5596bd47754bee38, now 14ca817c5b6d0526)"
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,4,declared,off,declared,open,0.5,mn4-declared,allow,not_run,not_run,not_run,not_run,0,0,False,0.004,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,4,declared,check_once,declared,open,0.5,mn4-declared,allow,pass,pass,not_run,not_run,2,2,False,0.144,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,4,declared,revalidate,declared,open,0.5,mn4-declared,block,pass,fail,pass,fail,4,4,False,43.505,"feasibility: path 'backup' has down links: s1-s3; state_binding: declared (3 keys): state changed since proposal (decided against 644b384082822f1b, now 2594139a60301e98)"
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,whole-state,off,whole,open,0.5,mn5-0,allow,not_run,not_run,not_run,not_run,0,0,False,0.006,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,whole-state,check_once,whole,open,0.5,mn5-0,allow,pass,pass,not_run,not_run,2,2,False,0.147,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,whole-state,revalidate,whole,open,0.5,mn5-0,block,pass,pass,pass,fail,4,4,False,48.874,"state_binding: whole-state: state changed since proposal (decided against 5e11df522f195047, now 5596bd47754bee38)"
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,declared target only,off,declared,open,0.5,mn5-1,allow,not_run,not_run,not_run,not_run,0,0,False,0.005,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,declared target only,check_once,declared,open,0.5,mn5-1,allow,pass,pass,not_run,not_run,2,2,False,0.143,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,declared target only,revalidate,declared,open,0.5,mn5-1,allow,pass,pass,pass,pass,4,4,False,47.648,4/4 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,declared premise+target,off,declared,open,0.5,mn5-2,allow,not_run,not_run,not_run,not_run,0,0,False,0.004,verification disabled
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,declared premise+target,check_once,declared,open,0.5,mn5-2,allow,pass,pass,not_run,not_run,2,2,False,0.145,2/2 checks passed
+a78213d8a594,2026-11-19T06:18:21+00:00,mininet,5,declared premise+target,revalidate,declared,open,0.5,mn5-2,block,pass,pass,pass,fail,4,4,False,47.296,"state_binding: declared (4 keys): state changed since proposal (decided against 04cd1aedc9f075cf, now d88d5169ec36aa50)"

@@ -43,8 +43,9 @@ and execution, and shows the three modes disagreeing:
 
 On a Linux machine with Mininet, `sudo python demo/run_demo.py --mininet` adds
 Cases 3–5 on a real three-switch topology. Mininet is a system package,
-not a pip dependency; the reference environment is the official Mininet VM
-image.
+not a pip dependency; the reference environment is Ubuntu 22.04 under WSL2
+with apt's `mininet` and `openvswitch-switch` (earlier runs used the official
+Mininet VM image).
 
 ## Run as a service
 
@@ -119,9 +120,10 @@ are compared, so an unrelated link flap does not block it. If it lists nothing,
 the whole state is compared, which works for any agent but blocks on any
 change. The scope is recorded on every result. Declared binding is only as
 good as the declaration: if it names what the action acts on but not why it was
-chosen, a change to the premise passes unseen. An action with no digest at all
-gets `not_applicable`; with the other three checks passing that is 3/4, which
-the default `min_coverage` of 0.5 does not flag. A malformed key is an `error`.
+chosen, a change to the premise passes unseen. An action with no digest at all,
+or an empty `depends_on`, gets `not_applicable` and the decision is flagged
+`weakly_verified` whatever the coverage ratio, so declining to bind cannot
+pass unnoticed. A malformed key is an `error`, which flags the same way.
 
 When coverage falls below `min_coverage`, the decision is flagged
 `weakly_verified` and `unknown_policy` decides what to do with it:
@@ -157,7 +159,7 @@ verifix/
 experiments/
 ├── cases.py           Cases 1–5, the single definition
 ├── run.py             one CSV row per case, variant and mode
-└── analyse.py         Table 2 from results/mininet-cases.csv
+└── analyse.py         Table 2 from results/mininet-cases-wsl.csv
 demo/run_demo.py       prints a narrative subset of the same cases
 results/               research data, append-only
 ```
@@ -170,7 +172,7 @@ gate and checks run against it. The only environment adapter is
 
 ```bash
 python -m experiments.run                    # Cases 1–2, CSV to stdout
-sudo .venv/bin/python -m experiments.run --mininet --out results/mininet-cases.csv
+sudo .venv/bin/python -m experiments.run --mininet --out results/mininet-cases-wsl.csv
 python -m experiments.analyse                # Table 2
 ```
 
@@ -182,7 +184,7 @@ cases.
 
 The gate, checks, Mininet adapter, HTTP API and evaluation tooling are built
 and tested. Cases 1–2 use static state; Cases 3–5 run on one Mininet topology
-on the Linux VM. There is
+under WSL2. There is
 no evaluation on real agents' actions: the two network-operations agent
 benchmarks examined (NetArena, NIKA) don't exercise state-changing actions with
 proposal-time state.

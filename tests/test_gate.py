@@ -146,6 +146,35 @@ def test_empty_dependency_set_is_not_a_pass() -> None:
         CheckStatus.NOT_APPLICABLE
 
 
+@pytest.mark.parametrize("digest, depends_on", [(None, None), ("x", [])])
+def test_opting_out_of_state_binding_is_flagged(digest, depends_on) -> None:
+    # No digest, or an empty dependency set, makes state binding abstain.
+    # At 3/4 that cleared the 0.5 floor, so it must flag on its own.
+    state = NetworkState(captured_at=0.0, links={"l1": True},
+                         paths={"backup": ["l1"]})
+    a = ProposedAction(action_id="c", kind="reroute",
+                       params={"target_path": "backup"}, proposed_at=0.0,
+                       state_digest=digest, depends_on=depends_on)
+    p = StaticStateProvider(state)
+    opened = Gate(p, unknown_policy=UnknownPolicy.OPEN).verify(a)
+    closed = Gate(p, unknown_policy=UnknownPolicy.CLOSED).verify(a)
+    assert (opened.coverage.evaluated, opened.coverage.total) == (3, 4)
+    assert opened.coverage.skipped == ["state_binding"]
+    assert opened.verdict is Verdict.ALLOW and opened.weakly_verified
+    assert closed.verdict is Verdict.BLOCK and closed.weakly_verified
+    assert "skipped: state_binding" in opened.reason
+
+
+def test_schema_aware_abstention_alone_is_left_to_the_ratio(states) -> None:
+    # Feasibility abstaining on an unknown kind is the floor's job, not an
+    # opt-out: 3/4 with a bound digest stays unflagged at the default.
+    now, before, _ = states
+    d = Gate(StaticStateProvider(before), unknown_policy=UnknownPolicy.CLOSED
+             ).verify(_action(now, before.digest(), kind="rebalance_ecmp_hash"))
+    assert d.coverage.skipped == ["feasibility"]
+    assert not d.weakly_verified and d.verdict is Verdict.ALLOW
+
+
 def test_unresolvable_dependency_key_is_an_error_in_the_gate() -> None:
     state = NetworkState(captured_at=0.0, links={"l1": True},
                          paths={"backup": ["l1"]})

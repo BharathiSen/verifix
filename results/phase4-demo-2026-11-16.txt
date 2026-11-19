@@ -1,0 +1,42 @@
+========================================================================
+CASE 1  known action: reroute onto 'backup', which dies before execution
+========================================================================
+  off          ALLOW cov 0/0  verification disabled
+  check_once   ALLOW cov 2/2  2/2 checks passed
+  revalidate   BLOCK cov 4/4  feasibility: path 'backup' has down links: r3-r4; state_binding: whole-state: state changed since proposal (decided against 13677c7492054654, now d05351a103624628)
+
+========================================================================
+CASE 2  unknown environment: opaque state, unrecognised action kind
+========================================================================
+  unknown=open    ALLOW cov 2/4  weak=True
+               weakly verified: only 2/4 checks applied (skipped: feasibility, state_binding)
+  unknown=closed  BLOCK cov 2/4  weak=True
+               weakly verified: only 2/4 checks applied (skipped: feasibility, state_binding)
+
+========================================================================
+CASE 3  Mininet: h3-s3, on neither path, drops: whole-state vs declared
+========================================================================
+  whole-state  BLOCK state_binding: whole-state: state changed since proposal (decided against 5596bd47754bee38, now 34558dcc63430d3f)
+  declared     ALLOW 4/4 checks passed
+
+========================================================================
+CASE 4  Mininet: s1-s3 dropped between proposal and execution
+========================================================================
+ whole-state binding
+  off          ALLOW cov 0/0  verification disabled
+  check_once   ALLOW cov 2/2  2/2 checks passed
+  revalidate   BLOCK cov 4/4  feasibility: path 'backup' has down links: s1-s3; state_binding: whole-state: state changed since proposal (decided against 5596bd47754bee38, now 14ca817c5b6d0526)
+ declared binding
+  off          ALLOW cov 0/0  verification disabled
+  check_once   ALLOW cov 2/2  2/2 checks passed
+  revalidate   BLOCK cov 4/4  feasibility: path 'backup' has down links: s1-s3; state_binding: declared (3 keys): state changed since proposal (decided against 644b384082822f1b, now 2594139a60301e98)
+
+========================================================================
+CASE 5  Mininet: primary s1-s2 recovers before the reroute runs
+========================================================================
+  whole-state              check_once ALLOW revalidate BLOCK feasibility=pass state_binding=fail
+  declared target only     check_once ALLOW revalidate ALLOW feasibility=pass state_binding=pass
+  declared premise+target  check_once ALLOW revalidate BLOCK feasibility=pass state_binding=fail
+
+The gate never guesses and never crashes. It reports what it could
+actually check, so a thin result is visible instead of looking like a pass.

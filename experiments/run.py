@@ -2,14 +2,15 @@
 
     python -m experiments.run                       # Cases 1-2, CSV to stdout
     sudo .venv/bin/python -m experiments.run --mininet \\
-        --out results/mininet-cases.csv              # all five, on the VM
+        --out results/mininet-cases-wsl.csv          # all five, under WSL2
 
 Run from the repository root. The cases themselves live in
 experiments/cases.py; this file only turns their decisions into rows.
 
-results/mininet-cases.csv is written only on the VM, because Cases 3-5 need
-Mininet. Without --out nothing touches results/, which is how this runs on
-a machine that isn't the VM.
+results/mininet-cases-wsl.csv is written only under WSL2, because Cases 3-5
+need Mininet; results/mininet-cases.csv holds the retired VM's runs and is
+no longer written. Without --out nothing touches results/, which is how this
+runs on plain Windows.
 """
 
 from __future__ import annotations
